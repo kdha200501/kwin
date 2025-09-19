@@ -836,6 +836,8 @@ void Workspace::initShortcuts()
                  Qt::META | Qt::Key_Backspace, &Workspace::slotWindowRestore, true);
     initShortcut("Window Minimize", i18n("Minimize Window"),
                  Qt::META | Qt::Key_PageDown, &Workspace::slotWindowMinimize, false);
+    initShortcut("Window Shade", i18n("Shade Window"),
+                 Qt::CTRL | Qt::Key_M, &Workspace::slotWindowShade, false);
     initShortcut("Window Move", i18n("Move Window"),
                  0, &Workspace::slotWindowMove, true);
     initShortcut("Window Resize", i18n("Resize Window"),
@@ -1126,6 +1128,14 @@ void Workspace::performWindowOperation(Window *window, Options::WindowOperation 
         break;
     case Options::MinimizeOp:
         window->setMinimized(true);
+        break;
+    case Options::ShadeOp:
+        // leach off the maximization mechanism to perform shading when the "Ctrl + M" combo is pressed
+        window->maximize(window->maximizeMode() == MaximizeShade
+                                     ? MaximizeRestore
+                                     : MaximizeShade);
+        raiseWindow(window);
+        requestFocus(window);
         break;
     case Options::OnAllDesktopsOp:
         window->setOnAllDesktops(!window->isOnAllDesktops());
