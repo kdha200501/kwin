@@ -808,7 +808,20 @@ void XdgToplevelWindow::doMinimize()
             workspace()->activateNextWindow(this);
         }
     }
-    workspace()->updateMinimizedOfTransients(this);
+
+    QList<Window *> stackingOrder = workspace()->stackingOrder();
+    for (KWin::Window *client : stackingOrder) {
+        if (client == this) {
+            workspace()->updateMinimizedOfTransients(client);
+            continue;
+        }
+
+        if (!Window::belongToSameApplication(client, this, Window::SameApplicationCheck::AllowCrossProcesses)) {
+            continue;
+        }
+
+        client->setMinimized(isMinimized());
+    }
 }
 
 void XdgToplevelWindow::doSetActive()

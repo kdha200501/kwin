@@ -895,7 +895,9 @@ void Workspace::initShortcuts()
     initShortcut("Window Maximize Horizontal", i18n("Maximize Window Horizontally"),
                  0, &Workspace::slotWindowMaximizeHorizontal);
     initShortcut("Window Minimize", i18n("Minimize Window"),
-                 Qt::META | Qt::Key_PageDown, &Workspace::slotWindowMinimize);
+                 Qt::CTRL | Qt::Key_H, &Workspace::slotWindowMinimize);
+    initShortcut("Window Minimize Others", "Minimize Other Windows",
+                 Qt::CTRL | Qt::SHIFT | Qt::Key_H, &Workspace::slotWindowMinimizeOthers);
     initShortcut("Window Shade", i18n("Shade Window"),
                  Qt::CTRL | Qt::Key_M, &Workspace::slotWindowShade);
     initShortcut("Window Move", i18n("Move Window"),
@@ -1174,6 +1176,39 @@ void Workspace::performWindowOperation(Window *window, Options::WindowOperation 
     case Options::MinimizeOp:
         window->setMinimized(true);
         break;
+    case Options::MinimizeOthersOp: {
+        if (
+            static_cast<NET::WindowType>(window->windowType()) == NET::Desktop ||
+            window->transientFor()
+        ) {
+            break;
+        }
+
+        if (
+            static_cast<NET::WindowType>(window->windowType()) == NET::Normal &&
+            window->resourceClass().compare("org.kde.dolphin", Qt::CaseInsensitive) == 0
+        ) {
+            break;
+        }
+
+        QList<Window *> stackingOrder = workspace()->stackingOrder();
+        for (KWin::Window *client : stackingOrder) {
+            if (client == window) {
+                continue;
+            }
+
+            if (Window::belongToSameApplication(client, window, Window::SameApplicationCheck::AllowCrossProcesses)) {
+                continue;
+            }
+
+            if (client->windowType() != WindowType::Normal) {
+                continue;
+            }
+
+            client->setMinimized(true);
+        }
+        break;
+    }
     case Options::ShadeOp:
         // leach off the maximization mechanism to perform shading when the "Ctrl + M" combo is pressed
         window->maximize(window->maximizeMode() == MaximizeShade
@@ -1367,6 +1402,13 @@ void Workspace::slotWindowMinimize()
 {
     if (USABLE_ACTIVE_WINDOW) {
         performWindowOperation(m_activeWindow, Options::MinimizeOp);
+    }
+}
+
+void Workspace::slotWindowMinimizeOthers()
+{
+    if (USABLE_ACTIVE_WINDOW) {
+        performWindowOperation(m_activeWindow, Options::MinimizeOthersOp);
     }
 }
 
