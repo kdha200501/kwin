@@ -387,6 +387,7 @@ public:
         MaximizeOp = 5000,
         RestoreOp,
         MinimizeOp,
+        MinimizeOthersOp,
         MoveOp,
         UnrestrictedMoveOp,
         ResizeOp,

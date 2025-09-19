@@ -1179,7 +1179,20 @@ void X11Window::doMinimize()
     }
     updateVisibility();
     updateAllowedActions();
-    workspace()->updateMinimizedOfTransients(this);
+
+    QList<Window *> stackingOrder = workspace()->stackingOrder();
+    for (KWin::Window *client : stackingOrder) {
+        if (client == this) {
+            workspace()->updateMinimizedOfTransients(client);
+            continue;
+        }
+
+        if (!Window::belongToSameApplication(client, this, Window::SameApplicationCheck::AllowCrossProcesses)) {
+            continue;
+        }
+
+        client->setMinimized(isMinimized());
+    }
 }
 
 void X11Window::updateVisibility()
