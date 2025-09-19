@@ -271,7 +271,7 @@ QPointF OverviewEffect::desktopOffsetForScreen(LogicalOutput *screen) const
 
 bool OverviewEffect::ignoreMinimized() const
 {
-    return OverviewConfig::ignoreMinimized();
+    return true;
 }
 
 bool OverviewEffect::organizedGrid() const
