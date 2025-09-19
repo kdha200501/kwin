@@ -16,6 +16,7 @@
 #include <QPoint>
 #include <QPointer>
 #include <QSize>
+#include <QTimer>
 
 // KDE includes
 #include <KConfig>
@@ -538,6 +539,8 @@ private:
     std::unique_ptr<QAction> m_swipeGestureReleasedY;
     std::unique_ptr<QAction> m_swipeGestureReleasedX;
     QPointF m_currentDesktopOffset = QPointF(0, 0);
+    QElapsedTimer m_backDebounceTimer;
+    QElapsedTimer m_forwardDebounceTimer;
 
     KWIN_SINGLETON_VARIABLE(VirtualDesktopManager, s_manager)
 };
