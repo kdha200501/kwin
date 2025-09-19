@@ -414,6 +414,7 @@ public:
         UnrestrictedResizeOp,
         CloseOp,
         OnAllDesktopsOp,
+        ShadeOp,
         KeepAboveOp,
         KeepBelowOp,
         WindowRulesOp,
