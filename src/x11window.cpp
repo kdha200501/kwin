@@ -3669,7 +3669,7 @@ void X11Window::configure(const Rect &nativeGeometry)
 }
 
 static bool changeMaximizeRecursion = false;
-void X11Window::maximize(MaximizeMode mode, const RectF &restore)
+void X11Window::maximize(MaximizeMode nextMaximizeMode, const RectF &restore)
 {
     if (isUnmanaged()) {
         qCWarning(KWIN_CORE) << "Cannot change maximized state of unmanaged window" << this;
@@ -3680,7 +3680,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         return;
     }
 
-    if (!isMaximizable() && mode != MaximizeRestore) {
+    if (!isMaximizable() && nextMaximizeMode != MaximizeRestore) {
         return;
     }
 
@@ -3691,10 +3691,13 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         clientArea = workspace()->clientArea(MaximizeArea, this, moveResizeOutput());
     }
 
-    MaximizeMode old_mode = max_mode;
+    MaximizeMode currentMaximizeMode = max_mode;
 
-    mode = rules()->checkMaximize(mode);
-    if (max_mode == mode) {
+    if (nextMaximizeMode != MaximizeShade) {
+        nextMaximizeMode = rules()->checkMaximize(nextMaximizeMode);
+    }
+
+    if (currentMaximizeMode == nextMaximizeMode) {
         return;
     }
 
@@ -3702,13 +3705,13 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
 
     // maximing one way and unmaximizing the other way shouldn't happen,
     // so restore first and then maximize the other way
-    if ((old_mode == MaximizeVertical && mode == MaximizeHorizontal)
-        || (old_mode == MaximizeHorizontal && mode == MaximizeVertical)) {
+    if ((currentMaximizeMode == MaximizeVertical && nextMaximizeMode == MaximizeHorizontal)
+        || (currentMaximizeMode == MaximizeHorizontal && nextMaximizeMode == MaximizeVertical)) {
         maximize(MaximizeRestore); // restore
     }
 
-    Q_EMIT maximizedAboutToChange(mode);
-    max_mode = mode;
+    Q_EMIT maximizedAboutToChange(nextMaximizeMode);
+    max_mode = nextMaximizeMode;
 
     // save sizes for restoring, if maximalizing
     QSizeF sz = size();
@@ -3718,11 +3721,11 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
     } else {
         if (requestedQuickTileMode() == QuickTileMode(QuickTileFlag::None)) {
             RectF savedGeometry = geometryRestore();
-            if (!(old_mode & MaximizeVertical)) {
+            if (!(currentMaximizeMode & MaximizeVertical)) {
                 savedGeometry.setTop(y());
                 savedGeometry.setHeight(sz.height());
             }
-            if (!(old_mode & MaximizeHorizontal)) {
+            if (!(currentMaximizeMode & MaximizeHorizontal)) {
                 savedGeometry.setLeft(x());
                 savedGeometry.setWidth(sz.width());
             }
@@ -3731,22 +3734,25 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
     }
 
     // call into decoration update borders
-    if (isDecorated() && decoration()->window() && !(options->borderlessMaximizedWindows() && max_mode == KWin::MaximizeFull)) {
+    if (isDecorated() && decoration()->window() && !(options->borderlessMaximizedWindows() && nextMaximizeMode == KWin::MaximizeFull)) {
         changeMaximizeRecursion = true;
         const auto c = decoration()->window();
-        if ((max_mode & MaximizeVertical) != (old_mode & MaximizeVertical)) {
-            Q_EMIT c->maximizedVerticallyChanged(max_mode & MaximizeVertical);
+        if ((nextMaximizeMode & MaximizeVertical) != (currentMaximizeMode & MaximizeVertical)) {
+            Q_EMIT c->maximizedVerticallyChanged(nextMaximizeMode & MaximizeVertical);
         }
-        if ((max_mode & MaximizeHorizontal) != (old_mode & MaximizeHorizontal)) {
-            Q_EMIT c->maximizedHorizontallyChanged(max_mode & MaximizeHorizontal);
+        if ((nextMaximizeMode & MaximizeHorizontal) != (currentMaximizeMode & MaximizeHorizontal)) {
+            Q_EMIT c->maximizedHorizontallyChanged(nextMaximizeMode & MaximizeHorizontal);
         }
-        if ((max_mode == MaximizeFull) != (old_mode == MaximizeFull)) {
-            Q_EMIT c->maximizedChanged(max_mode == MaximizeFull);
+        if ((nextMaximizeMode == MaximizeFull) != (currentMaximizeMode == MaximizeFull)) {
+            Q_EMIT c->maximizedChanged(nextMaximizeMode == MaximizeFull);
+        }
+        if ((nextMaximizeMode == MaximizeShade) != (currentMaximizeMode == MaximizeShade)) {
+            Q_EMIT c->maximizedChanged(nextMaximizeMode == MaximizeShade);
         }
         changeMaximizeRecursion = false;
     }
 
-    if (options->borderlessMaximizedWindows()) {
+    if (nextMaximizeMode != MaximizeShade && options->borderlessMaximizedWindows()) {
         // triggers a maximize change.
         // The next setNoBorder iteration will exit since there's no change but the first recursion pullutes the restore geometry
         changeMaximizeRecursion = true;
@@ -3754,10 +3760,10 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         changeMaximizeRecursion = false;
     }
 
-    switch (max_mode) {
+    switch (nextMaximizeMode) {
 
     case MaximizeVertical: {
-        if (old_mode & MaximizeHorizontal) { // actually restoring from MaximizeFull
+        if (currentMaximizeMode & MaximizeHorizontal) { // actually restoring from MaximizeFull
             if (geometryRestore().width() == 0) {
                 // needs placement
                 const QSizeF constraintedSize = constrainFrameSize(QSizeF(width() * 2 / 3, clientArea.height()), SizeModeFixedH);
@@ -3778,7 +3784,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
     }
 
     case MaximizeHorizontal: {
-        if (old_mode & MaximizeVertical) { // actually restoring from MaximizeFull
+        if (currentMaximizeMode & MaximizeVertical) { // actually restoring from MaximizeFull
             if (geometryRestore().height() == 0) {
                 // needs placement
                 const QSizeF constraintedSize = constrainFrameSize(QSizeF(clientArea.width(), height() * 2 / 3), SizeModeFixedW);
@@ -3801,11 +3807,11 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
     case MaximizeRestore: {
         RectF restore = moveResizeGeometry();
         // when only partially maximized, geom_restore may not have the other dimension remembered
-        if (old_mode & MaximizeVertical) {
+        if (currentMaximizeMode & MaximizeVertical) {
             restore.setTop(geometryRestore().top());
             restore.setBottom(geometryRestore().bottom());
         }
-        if (old_mode & MaximizeHorizontal) {
+        if (currentMaximizeMode & MaximizeHorizontal) {
             restore.setLeft(geometryRestore().left());
             restore.setRight(geometryRestore().right());
         }
@@ -3851,6 +3857,11 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         break;
     }
 
+    case MaximizeShade: {
+        moveResize(QRectF(geometryRestore().x(), geometryRestore().y(), geometryRestore().width(), 24));
+        break;
+    }
+
     case MaximizeFull: {
         moveResize(clientArea);
         exitQuickTileMode();
@@ -3867,7 +3878,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
     updateAllowedActions();
     updateWindowRules(Rules::MaximizeVert | Rules::MaximizeHoriz | Rules::Position | Rules::Size);
 
-    if (max_mode != old_mode) {
+    if (nextMaximizeMode != currentMaximizeMode) {
         Q_EMIT maximizedChanged();
     }
 }
