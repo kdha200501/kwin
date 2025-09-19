@@ -476,6 +476,8 @@ public Q_SLOTS:
     void slotWindowMaximizeHorizontal();
     void slotWindowRestore();
     void slotWindowMinimize();
+    void slotWindowMinimizeOthers();
+    void slotWindowShade();
     void slotWindowRaise();
     void slotWindowLower();
     void slotWindowRaiseOrLower();
