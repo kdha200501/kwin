@@ -9,6 +9,10 @@
 */
 #include "virtualdesktops.h"
 #include "input.h"
+#include "keyboard_input.h"
+#include "pointer_input.h"
+#include "workspace.h"
+#include "window.h"
 #include "wayland/plasmavirtualdesktop.h"
 // KDE
 #include <KConfigGroup>
@@ -24,6 +28,8 @@
 #include <QUuid>
 
 #include <algorithm>
+#include <linux/input-event-codes.h>
+#include <chrono>
 
 namespace KWin
 {
@@ -769,6 +775,26 @@ QString VirtualDesktopManager::defaultName(int desktop) const
     return i18n("Desktop %1", desktop);
 }
 
+bool isCursorOnActiveWindow() {
+    if (!Workspace::self()) {
+        return false;
+    }
+
+    const auto activeWindow = Workspace::self()->activeWindow();
+    const auto pointer = input()->pointer();
+
+    if (!activeWindow || !pointer) {
+        return false;
+    }
+
+    if (activeWindow->isDesktop() || activeWindow->isDock() || activeWindow->isSplash()) {
+        return false;
+    }
+
+    const QPoint cursorPos = pointer->pos().toPoint();;
+    return activeWindow->frameGeometry().contains(cursorPos);
+}
+
 void VirtualDesktopManager::initShortcuts()
 {
     initSwitchToShortcuts();
@@ -799,24 +825,74 @@ void VirtualDesktopManager::initShortcuts()
             Q_EMIT currentChanging(currentDesktop(), m_currentDesktopOffset);
         }
     };
-    input()->registerTouchpadSwipeShortcut(SwipeDirection::Left, 3, m_swipeGestureReleasedX.get(), left);
-    input()->registerTouchpadSwipeShortcut(SwipeDirection::Right, 3, m_swipeGestureReleasedX.get(), right);
+    input()->registerTouchpadSwipeShortcut(SwipeDirection::Left, 3, m_swipeGestureReleasedX.get(), [this](qreal cb) {
+        using namespace std::chrono_literals;
+
+        if (cb != 1.0 || !isCursorOnActiveWindow()) {
+            return;
+        }
+
+        auto keyboard = input()->keyboard();
+
+        if (!keyboard) {
+            return;
+        }
+
+        if (m_backDebounceTimer.isValid() && m_backDebounceTimer.elapsed() < 300) {
+            return;
+        }
+
+        m_backDebounceTimer.restart();
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(now);
+
+        keyboard->processKey(KEY_LEFTALT, KWin::KeyboardKeyState::Pressed, timestamp + 10ms);
+        keyboard->processKey(KEY_LEFT, KWin::KeyboardKeyState::Pressed, timestamp + 20ms);
+        keyboard->processKey(KEY_LEFT, KWin::KeyboardKeyState::Released, timestamp + 30ms);
+        keyboard->processKey(KEY_LEFTALT, KWin::KeyboardKeyState::Released, timestamp + 40ms);
+    });
+    input()->registerTouchpadSwipeShortcut(SwipeDirection::Right, 3, m_swipeGestureReleasedX.get(), [this](qreal cb) {
+        using namespace std::chrono_literals;
+
+        if (cb != 1.0 || !isCursorOnActiveWindow()) {
+            return;
+        }
+
+        auto keyboard = input()->keyboard();
+
+        if (!keyboard) {
+            return;
+        }
+
+        if (m_forwardDebounceTimer.isValid() && m_forwardDebounceTimer.elapsed() < 300) {
+            return;
+        }
+
+        m_forwardDebounceTimer.restart();
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(now);
+
+        keyboard->processKey(KEY_LEFTALT, KWin::KeyboardKeyState::Pressed, timestamp + 10ms);
+        keyboard->processKey(KEY_RIGHT, KWin::KeyboardKeyState::Pressed, timestamp + 20ms);
+        keyboard->processKey(KEY_RIGHT, KWin::KeyboardKeyState::Released, timestamp + 30ms);
+        keyboard->processKey(KEY_LEFTALT, KWin::KeyboardKeyState::Released, timestamp + 40ms);
+    });
     input()->registerTouchpadSwipeShortcut(SwipeDirection::Left, 4, m_swipeGestureReleasedX.get(), right);
     input()->registerTouchpadSwipeShortcut(SwipeDirection::Right, 4, m_swipeGestureReleasedX.get(), left);
-    input()->registerTouchpadSwipeShortcut(SwipeDirection::Down, 3, m_swipeGestureReleasedY.get(), [this](qreal cb) {
-        if (grid().height() > 1) {
-            m_currentDesktopOffset.setY(-cb);
-            Q_EMIT currentChanging(currentDesktop(), m_currentDesktopOffset);
-        }
-    });
-    input()->registerTouchpadSwipeShortcut(SwipeDirection::Up, 3, m_swipeGestureReleasedY.get(), [this](qreal cb) {
-        if (grid().height() > 1) {
-            m_currentDesktopOffset.setY(cb);
-            Q_EMIT currentChanging(currentDesktop(), m_currentDesktopOffset);
-        }
-    });
-    input()->registerTouchscreenSwipeShortcut(SwipeDirection::Left, 3, m_swipeGestureReleasedX.get(), left);
-    input()->registerTouchscreenSwipeShortcut(SwipeDirection::Right, 3, m_swipeGestureReleasedX.get(), right);
+    // input()->registerTouchpadSwipeShortcut(SwipeDirection::Down, 3, m_swipeGestureReleasedY.get(), [this](qreal cb) {
+    //     if (grid().height() > 1) {
+    //         m_currentDesktopOffset.setY(-cb);
+    //         Q_EMIT currentChanging(currentDesktop(), m_currentDesktopOffset);
+    //     }
+    // });
+    // input()->registerTouchpadSwipeShortcut(SwipeDirection::Up, 3, m_swipeGestureReleasedY.get(), [this](qreal cb) {
+    //     if (grid().height() > 1) {
+    //         m_currentDesktopOffset.setY(cb);
+    //         Q_EMIT currentChanging(currentDesktop(), m_currentDesktopOffset);
+    //     }
+    // });
+    // input()->registerTouchscreenSwipeShortcut(SwipeDirection::Left, 3, m_swipeGestureReleasedX.get(), left);
+    // input()->registerTouchscreenSwipeShortcut(SwipeDirection::Right, 3, m_swipeGestureReleasedX.get(), right);
 
     // axis events
     input()->registerAxisShortcut(Qt::MetaModifier | Qt::AltModifier, PointerAxisDown,
