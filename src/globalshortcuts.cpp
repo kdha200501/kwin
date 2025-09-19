@@ -17,6 +17,9 @@
 #include "utils/common.h"
 // KDE
 #if KWIN_BUILD_GLOBALSHORTCUTS
+#include "workspace.h"
+#include "window.h"
+#include <NETWM>
 #include <kglobalaccel_interface.h>
 #include <kglobalacceld.h>
 #endif
@@ -203,6 +206,29 @@ bool GlobalShortcutsManager::processKey(Qt::KeyboardModifiers mods, int keyQt)
             return retVal;
         };
         if (check(mods, keyQt)) {
+            if (!(mods & Qt::CTRL) || !(mods & Qt::SHIFT) || keyQt != Qt::Key_H) {
+                return true;
+            }
+
+            Window *window = workspace()->activeWindow();
+
+            if(!window) {
+                return true;
+            }
+
+            if (
+                static_cast<NET::WindowType>(window->windowType()) == NET::Desktop ||
+                window->transientFor()
+            ) {
+                return false;
+            }
+
+            if (
+                static_cast<NET::WindowType>(window->windowType()) == NET::Normal &&
+                window->resourceClass().compare("org.kde.dolphin", Qt::CaseInsensitive) == 0
+            ) {
+                return false;
+            }
             return true;
         } else if (keyQt == Qt::Key_Backtab) {
             // KGlobalAccel on X11 has some workaround for Backtab
