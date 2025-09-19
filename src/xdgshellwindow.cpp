@@ -835,20 +835,52 @@ void XdgToplevelWindow::doSetFullScreen()
     scheduleConfigure();
 }
 
-void XdgToplevelWindow::doSetMaximized()
+/*
+    Inflict a difference between `m_acknowledgedStates` and `m_nextStates` so that, a delta can be observed when the
+    two members are compared
+*/
+void XdgToplevelWindow::doSetMaximized(MaximizeMode nextMaximizeMode, MaximizeMode currentMaximizeMode)
 {
-    if (requestedMaximizeMode() & MaximizeHorizontal) {
-        m_nextStates |= XdgToplevelInterface::State::MaximizedHorizontal;
+    /*
+        Prepare `m_nextStates`
+        since the shade state leaches off the maximization mechanism, `m_nextStates` needs to be compensated so that,
+        the delta will correctly reflect the need to maximize
+    */
+    if (nextMaximizeMode == MaximizeShade) {
+        m_nextStates |= XdgToplevelInterface::State::Shaded;
     } else {
-        m_nextStates &= ~XdgToplevelInterface::State::MaximizedHorizontal;
+        m_nextStates &= ~XdgToplevelInterface::State::Shaded;
+
+        if (nextMaximizeMode & MaximizeHorizontal) {
+            m_nextStates |= XdgToplevelInterface::State::MaximizedHorizontal;
+        }
+
+        if (nextMaximizeMode & MaximizeVertical) {
+            m_nextStates |= XdgToplevelInterface::State::MaximizedVertical;
+        }
     }
 
-    if (requestedMaximizeMode() & MaximizeVertical) {
-        m_nextStates |= XdgToplevelInterface::State::MaximizedVertical;
-    } else {
-        m_nextStates &= ~XdgToplevelInterface::State::MaximizedVertical;
+    /*
+        Prepare `m_acknowledgedStates`
+        since the shade state leaches off the maximization mechanism, `m_acknowledgedStates` needs to be compensated
+        so that, the delta will correctly reflect the need to maximize
+    */
+
+    // if the transition is to go from MaximizeShade to MaximizeFull
+    if (currentMaximizeMode == MaximizeShade && nextMaximizeMode == MaximizeFull) {
+        // then unset the shade bits to ensure the delta will reflect change in maximization
+        m_acknowledgedStates &= ~XdgToplevelInterface::State::Shaded;
     }
 
+    // if the transition is to go from MaximizeFull to MaximizeShade
+    if (currentMaximizeMode == MaximizeFull && nextMaximizeMode == MaximizeShade) {
+        // then unset the maximize bits to ensure the delta will reflect change in shading
+        m_acknowledgedStates &= ~XdgToplevelInterface::State::Maximized;
+    }
+
+    /*
+        Schedule comparison between `m_acknowledgedStates` and `m_nextStates`
+    */
     scheduleConfigure();
 }
 
@@ -1034,7 +1066,10 @@ void XdgToplevelWindow::handleStatesAcknowledged(const XdgToplevelInterface::Sta
 {
     const XdgToplevelInterface::States delta = m_acknowledgedStates ^ states;
 
-    if (delta & XdgToplevelInterface::State::Maximized) {
+    if (states & (XdgToplevelInterface::State::Shaded & ~XdgToplevelInterface::State::Maximized)) {
+        updateMaximizeMode(MaximizeShade);
+    }
+    else if (delta & XdgToplevelInterface::State::Maximized) {
         MaximizeMode maximizeMode = MaximizeRestore;
         if (states & XdgToplevelInterface::State::MaximizedHorizontal) {
             maximizeMode = MaximizeMode(maximizeMode | MaximizeHorizontal);
@@ -1679,8 +1714,64 @@ void XdgToplevelWindow::setFullScreen(bool set)
     doSetFullScreen();
 }
 
+void XdgToplevelWindow::setNextMaximizeHorizontalGeometry(QRectF &nextGeometry, const QRectF &clientArea, MaximizeMode nextMaximizeMode)
+{
+    // if the window is to be maximized
+    if (nextMaximizeMode & MaximizeHorizontal && nextMaximizeMode != MaximizeShade) {
+        // then take the full view port width
+        nextGeometry.setX(clientArea.x());
+        nextGeometry.setWidth(clientArea.width());
+        return;
+    }
+
+    QRectF previousGeometry = geometryRestore();
+
+    if (!previousGeometry.isValid()) {
+        nextGeometry.setX(clientArea.x());
+        nextGeometry.setWidth(0);
+        return;
+    }
+
+    // if the window is to be shaded or restored,
+    // then restore
+    nextGeometry.setX(previousGeometry.x());
+    nextGeometry.setWidth(previousGeometry.width());
+}
+
+void XdgToplevelWindow::setNextMaximizeVerticalGeometry(QRectF &nextGeometry, const QRectF &clientArea, MaximizeMode nextMaximizeMode)
+{
+    // if the window is to be maximized
+    if (nextMaximizeMode & MaximizeVertical && nextMaximizeMode != MaximizeShade) {
+        // then take the full view port height
+        nextGeometry.setY(clientArea.y());
+        nextGeometry.setHeight(clientArea.height());
+        return;
+    }
+
+    QRectF previousGeometry = geometryRestore();
+
+    if (!previousGeometry.isValid()) {
+        nextGeometry.setY(clientArea.y());
+        nextGeometry.setHeight(0);
+        return;
+    }
+
+    // if the window is to be shaded
+    if (nextMaximizeMode & MaximizeVertical && nextMaximizeMode == MaximizeShade) {
+        // then shrink to the window title bar height
+        nextGeometry.setY(previousGeometry.y());
+        nextGeometry.setHeight(24);
+        return;
+    }
+
+    // if the window is to be restored,
+    // then restore
+    nextGeometry.setY(previousGeometry.y());
+    nextGeometry.setHeight(previousGeometry.height());
+}
+
 static bool changeMaximizeRecursion = false;
-void XdgToplevelWindow::maximize(MaximizeMode mode, const QRectF &restore)
+void XdgToplevelWindow::maximize(MaximizeMode nextMaximizeMode, const QRectF &restore)
 {
     if (changeMaximizeRecursion) {
         return;
@@ -1692,35 +1783,43 @@ void XdgToplevelWindow::maximize(MaximizeMode mode, const QRectF &restore)
 
     const QRectF clientArea = isElectricBorderMaximizing() ? workspace()->clientArea(MaximizeArea, this, interactiveMoveResizeAnchor()) : workspace()->clientArea(MaximizeArea, this, moveResizeOutput());
 
-    const MaximizeMode oldMode = m_requestedMaximizeMode;
+    const MaximizeMode currentMaximizeMode = m_requestedMaximizeMode;
     const QRectF oldGeometry = moveResizeGeometry();
 
-    mode = rules()->checkMaximize(mode);
-    if (m_requestedMaximizeMode == mode) {
+    if (nextMaximizeMode != MaximizeShade) {
+        nextMaximizeMode = rules()->checkMaximize(nextMaximizeMode);
+    }
+
+    if (currentMaximizeMode == nextMaximizeMode) {
         return;
     }
 
-    Q_EMIT maximizedAboutToChange(mode);
-    m_requestedMaximizeMode = mode;
+    Q_EMIT maximizedAboutToChange(nextMaximizeMode);
+
+    // backup the next maximize mode (it will become the currentMaximizeMode in the next round)
+    m_requestedMaximizeMode = nextMaximizeMode;
 
     // call into decoration update borders
-    if (m_nextDecoration && !(options->borderlessMaximizedWindows() && m_requestedMaximizeMode == MaximizeFull)) {
+    if (m_nextDecoration && !(options->borderlessMaximizedWindows() && nextMaximizeMode == MaximizeFull)) {
         changeMaximizeRecursion = true;
         const auto c = m_nextDecoration->window();
-        if ((m_requestedMaximizeMode & MaximizeVertical) != (oldMode & MaximizeVertical)) {
-            Q_EMIT c->maximizedVerticallyChanged(m_requestedMaximizeMode & MaximizeVertical);
+        if ((nextMaximizeMode & MaximizeVertical) != (currentMaximizeMode & MaximizeVertical)) {
+            Q_EMIT c->maximizedVerticallyChanged(nextMaximizeMode & MaximizeVertical);
         }
-        if ((m_requestedMaximizeMode & MaximizeHorizontal) != (oldMode & MaximizeHorizontal)) {
-            Q_EMIT c->maximizedHorizontallyChanged(m_requestedMaximizeMode & MaximizeHorizontal);
+        if ((nextMaximizeMode & MaximizeHorizontal) != (currentMaximizeMode & MaximizeHorizontal)) {
+            Q_EMIT c->maximizedHorizontallyChanged(nextMaximizeMode & MaximizeHorizontal);
         }
-        if ((m_requestedMaximizeMode == MaximizeFull) != (oldMode == MaximizeFull)) {
-            Q_EMIT c->maximizedChanged(m_requestedMaximizeMode == MaximizeFull);
+        if ((nextMaximizeMode == MaximizeFull) != (currentMaximizeMode == MaximizeFull)) {
+            Q_EMIT c->maximizedChanged(nextMaximizeMode == MaximizeFull);
+        }
+        if ((nextMaximizeMode == MaximizeShade) != (currentMaximizeMode == MaximizeShade)) {
+            Q_EMIT c->maximizedChanged(nextMaximizeMode == MaximizeShade);
         }
         changeMaximizeRecursion = false;
     }
 
-    if (options->borderlessMaximizedWindows()) {
-        setNoBorder(m_requestedMaximizeMode == MaximizeFull);
+    if (nextMaximizeMode != MaximizeShade && options->borderlessMaximizedWindows()) {
+        setNoBorder(nextMaximizeMode == MaximizeFull);
     }
 
     if (!restore.isNull()) {
@@ -1728,11 +1827,11 @@ void XdgToplevelWindow::maximize(MaximizeMode mode, const QRectF &restore)
     } else {
         if (requestedQuickTileMode() == QuickTileMode(QuickTileFlag::None)) {
             QRectF savedGeometry = geometryRestore();
-            if (!(oldMode & MaximizeVertical)) {
+            if (!(currentMaximizeMode & MaximizeVertical)) {
                 savedGeometry.setTop(oldGeometry.top());
                 savedGeometry.setBottom(oldGeometry.bottom());
             }
-            if (!(oldMode & MaximizeHorizontal)) {
+            if (!(currentMaximizeMode & MaximizeHorizontal)) {
                 savedGeometry.setLeft(oldGeometry.left());
                 savedGeometry.setRight(oldGeometry.right());
             }
@@ -1740,52 +1839,19 @@ void XdgToplevelWindow::maximize(MaximizeMode mode, const QRectF &restore)
         }
     }
 
-    if (m_requestedMaximizeMode != MaximizeRestore) {
+    if (nextMaximizeMode != MaximizeRestore) {
         exitQuickTileMode();
     }
 
-    QRectF geometry = oldGeometry;
+    QRectF nextMaximizeGeometry = oldGeometry;
+    setNextMaximizeHorizontalGeometry(nextMaximizeGeometry, clientArea, nextMaximizeMode);
+    setNextMaximizeVerticalGeometry(nextMaximizeGeometry, clientArea, nextMaximizeMode);
 
-    if (m_requestedMaximizeMode & MaximizeHorizontal) {
-        // Stretch the window vertically to fit the size of the maximize area.
-        geometry.setX(clientArea.x());
-        geometry.setWidth(clientArea.width());
-    } else if (oldMode & MaximizeHorizontal) {
-        if (geometryRestore().isValid()) {
-            // The window is no longer maximized horizontally and the saved geometry is valid.
-            geometry.setX(geometryRestore().x());
-            geometry.setWidth(geometryRestore().width());
-        } else {
-            // The window is no longer maximized horizontally and the saved geometry is
-            // invalid. This would happen if the window had been mapped in the maximized state.
-            // We ask the client to resize the window horizontally to its preferred size.
-            geometry.setX(clientArea.x());
-            geometry.setWidth(0);
-        }
-    }
-
-    if (m_requestedMaximizeMode & MaximizeVertical) {
-        // Stretch the window horizontally to fit the size of the maximize area.
-        geometry.setY(clientArea.y());
-        geometry.setHeight(clientArea.height());
-    } else if (oldMode & MaximizeVertical) {
-        if (geometryRestore().isValid()) {
-            // The window is no longer maximized vertically and the saved geometry is valid.
-            geometry.setY(geometryRestore().y());
-            geometry.setHeight(geometryRestore().height());
-        } else {
-            // The window is no longer maximized vertically and the saved geometry is
-            // invalid. This would happen if the window had been mapped in the maximized state.
-            // We ask the client to resize the window vertically to its preferred size.
-            geometry.setY(clientArea.y());
-            geometry.setHeight(0);
-        }
-    }
-
-    moveResize(geometry);
+    // emit signal to resize window
+    moveResize(nextMaximizeGeometry);
     markAsPlaced();
 
-    doSetMaximized();
+    doSetMaximized(nextMaximizeMode, currentMaximizeMode);
 }
 
 XdgPopupWindow::XdgPopupWindow(XdgPopupInterface *shellSurface)

@@ -170,7 +170,8 @@ DELEGATE(requestContextHelp, showContextHelp)
 
 void DecoratedWindowImpl::requestMinimize()
 {
-    m_window->setMinimized(true);
+    // leach off the maximization mechanism to perform shading when the "minimize" window CTA is clicked
+    delayedRequestToggleMaximization(Options::ShadeOp);
 }
 
 void DecoratedWindowImpl::requestClose()

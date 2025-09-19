@@ -163,6 +163,8 @@ public:
     bool wantsInput() const override;
     void setFullScreen(bool set) override;
     void closeWindow() override;
+    void setNextMaximizeHorizontalGeometry(QRectF &nextGeometry, const QRectF &clientArea, MaximizeMode nextMaximizeMode);
+    void setNextMaximizeVerticalGeometry(QRectF &nextGeometry, const QRectF &clientArea, MaximizeMode nextMaximizeMode);
     void maximize(MaximizeMode mode, const QRectF &restore = QRectF()) override;
 
     void installAppMenu(AppMenuInterface *appMenu);
@@ -179,7 +181,7 @@ protected:
     void doMinimize() override;
     void doSetActive() override;
     void doSetFullScreen();
-    void doSetMaximized();
+    void doSetMaximized(MaximizeMode nextMaximizeMode, MaximizeMode currentMaximizeMode);
     bool doStartInteractiveMoveResize() override;
     void doFinishInteractiveMoveResize() override;
     bool acceptsFocus() const override;

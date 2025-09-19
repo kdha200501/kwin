@@ -214,8 +214,8 @@ class KWIN_EXPORT XdgToplevelInterface : public QObject
 
 public:
     enum State {
-        MaximizedHorizontal = 0x1,
-        MaximizedVertical = 0x2,
+        MaximizedHorizontal = 0x1,//                           000000000001 in practice, kwin treats this flag as size-changed-horizontally
+        MaximizedVertical = 0x2,//                             000000000010 in practice, kwin treats this flag as size-changed-vertically
         FullScreen = 0x4,
         Resizing = 0x8,
         Activated = 0x10,
@@ -224,7 +224,8 @@ public:
         TiledRight = 0x80,
         TiledBottom = 0x100,
         Suspended = 0x200,
-        Maximized = MaximizedHorizontal | MaximizedVertical,
+        Maximized = MaximizedHorizontal | MaximizedVertical,// 000000000011
+        Shaded = 0x403,//                                      010000000011
     };
     Q_DECLARE_FLAGS(States, State)
 
