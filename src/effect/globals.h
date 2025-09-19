@@ -59,6 +59,7 @@ enum MaximizeMode {
     MaximizeHorizontal = 2, ///< The window is maximized horizontally.
     /// Equal to @p MaximizeVertical | @p MaximizeHorizontal
     MaximizeFull = MaximizeVertical | MaximizeHorizontal,
+    MaximizeShade = 1027,
 };
 Q_ENUM_NS(MaximizeMode)
 
