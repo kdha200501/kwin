@@ -14,6 +14,7 @@
 #include "workspace.h"
 // Qt
 #include <QAbstractItemModel>
+#include <QScreen>
 
 namespace KWin
 {
@@ -71,7 +72,7 @@ void SwitcherItem::setVisible(bool visible)
 
 QRect SwitcherItem::screenGeometry() const
 {
-    return workspace()->activeOutput()->geometry();
+    return QGuiApplication::primaryScreen()->geometry();
 }
 
 void SwitcherItem::setCurrentIndex(int index)
