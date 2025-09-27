@@ -13,6 +13,7 @@
 #include "workspace.h"
 // Qt
 #include <QAbstractItemModel>
+#include <QScreen>
 
 namespace KWin
 {
@@ -69,16 +70,10 @@ void SwitcherItem::setVisible(bool visible)
 
 QRect SwitcherItem::screenGeometry() const
 {
-    switch (tabBox->config().showScreenMode()) {
-    case TabBoxConfig::ShowOnPrimaryScreen:
-        if (!workspace()->outputOrder().isEmpty()) {
-            return workspace()->outputOrder().front()->geometry();
-        }
-        Q_FALLTHROUGH();
-    case TabBoxConfig::ShowOnActiveScreen:
-        return workspace()->activeOutput()->geometry();
+    if (!workspace()->outputOrder().isEmpty()) {
+        return workspace()->outputOrder().front()->geometry();
     }
-    Q_UNREACHABLE();
+    return workspace()->activeOutput()->geometry();
 }
 
 void SwitcherItem::setCurrentIndex(int index)
