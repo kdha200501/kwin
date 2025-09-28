@@ -1525,6 +1525,11 @@ void XdgToplevelWindow::updateCapabilities()
 void XdgToplevelWindow::updateIcon()
 {
     if (!m_shellSurface->customIcon().isNull()) {
+        if(m_shellSurface->customIcon().name().toStdString() == "" && iconFromDesktopFile().toStdString() == "google-chrome-canary") {
+            setIcon(QIcon::fromTheme(QStringLiteral("google-chrome-canary")));
+            return;
+        }
+
         setIcon(m_shellSurface->customIcon());
         return;
     }
