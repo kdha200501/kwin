@@ -74,6 +74,11 @@ QVariant ClientModel::data(const QModelIndex &index, int role) const
         if (client->isDesktop()) {
             return QIcon::fromTheme(QStringLiteral("user-desktop"));
         }
+
+        if (client->resourceClass().toStdString() == "google-chrome-canary") {
+            return QIcon::fromTheme(QStringLiteral("google-chrome-canary"));
+        }
+
         return client->icon();
     default:
         return QVariant();
