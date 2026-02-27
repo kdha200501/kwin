@@ -1154,7 +1154,8 @@ void Workspace::performWindowOperation(Window *window, Options::WindowOperation 
         window->maximize(window->maximizeMode() == MaximizeShade
                                      ? MaximizeRestore
                                      : MaximizeShade);
-        takeActivity(window, ActivityFocus | ActivityRaise);
+        raiseWindow(window);
+        requestFocus(window);
         break;
     case Options::OnAllDesktopsOp:
         window->setOnAllDesktops(!window->isOnAllDesktops());
