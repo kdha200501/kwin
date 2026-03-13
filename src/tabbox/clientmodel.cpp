@@ -75,6 +75,8 @@ QVariant ClientModel::data(const QModelIndex &index, int role) const
             return QIcon::fromTheme(QStringLiteral("user-desktop"));
         }
         return client->icon();
+    case ResourceClassRole:
+        return client->resourceClass();
     default:
         return QVariant();
     }
@@ -129,6 +131,7 @@ QHash<int, QByteArray> ClientModel::roleNames() const
         {MinimizedRole, QByteArrayLiteral("minimized")},
         {WIdRole, QByteArrayLiteral("windowId")},
         {CloseableRole, QByteArrayLiteral("closeable")},
+        {ResourceClassRole, QByteArrayLiteral("resourceClass")},
         {IconRole, QByteArrayLiteral("icon")},
     };
 }
