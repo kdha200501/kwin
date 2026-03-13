@@ -49,6 +49,7 @@ public:
         IconRole,
         WindowIdRole,
         CloseableRole,
+        ResourceClassRole,
     };
 
     explicit ExampleClientModel(QObject *parent = nullptr);
