@@ -211,6 +211,8 @@ QVariant ExampleClientModel::data(const QModelIndex &index, int role) const
         return item.wId;
     case CloseableRole:
         return item.wId != WindowThumbnailItem::Desktop;
+    case ResourceClassRole:
+        return item.icon;
     }
     return QVariant();
 }
@@ -240,6 +242,7 @@ QHash<int, QByteArray> ExampleClientModel::roleNames() const
         {IconRole, QByteArrayLiteral("icon")},
         {WindowIdRole, QByteArrayLiteral("windowId")},
         {CloseableRole, QByteArrayLiteral("closeable")},
+        {ResourceClassRole, QByteArrayLiteral("resourceClass")},
     };
 }
 
