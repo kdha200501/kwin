@@ -47,6 +47,8 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QJSEngine>
 #include <QMouseEvent>
 #include <QStyleHints>
@@ -87,7 +89,8 @@ Window::Window()
     // replace on-screen-display on size changes
     connect(this, &Window::frameGeometryChanged, this, [this](const RectF &old) {
         if (isOnScreenDisplay() && !frameGeometry().isEmpty() && old.size() != frameGeometry().size() && isPlaceable()) {
-            if (const auto placement = workspace()->placement()->place(this, workspace()->clientArea(PlacementArea, this, workspace()->activeOutput()))) {
+            auto *output = workspace()->outputAt(QGuiApplication::primaryScreen()->geometry().center());
+            if (const auto placement = workspace()->placement()->place(this, workspace()->clientArea(PlacementArea, this, output))) {
                 place(*placement);
             }
         }
