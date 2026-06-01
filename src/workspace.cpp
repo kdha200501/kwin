@@ -83,6 +83,8 @@
 #include <QCryptographicHash>
 #include <QDBusConnection>
 #include <QDBusPendingCall>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QMetaProperty>
 #include <ranges>
 
@@ -954,7 +956,10 @@ void Workspace::addWaylandWindow(Window *window)
     window->updateLayer();
 
     if (window->isPlaceable() && !window->isPlaced()) {
-        const RectF area = clientArea(PlacementArea, window, activeOutput());
+        auto *placementOutput = window->isOnScreenDisplay()
+            ? outputAt(QGuiApplication::primaryScreen()->geometry().center())
+            : activeOutput();
+        const RectF area = clientArea(PlacementArea, window, placementOutput);
         if (const auto placement = m_placement->place(window, area)) {
             window->place(*placement);
         }
