@@ -72,10 +72,13 @@ QVariant ClientModel::data(const QModelIndex &index, int role) const
         return client->isCloseable();
     case IconRole:
         if (client->isDesktop()) {
-            return QIcon::fromTheme(QStringLiteral("user-desktop"));
+            return QIcon::fromTheme(QStringLiteral("org.kde.dolphin"));
         }
         return client->icon();
     case ResourceClassRole:
+        if (client->isDesktop()) {
+            return QStringLiteral("org.kde.dolphin");
+        }
         return client->resourceClass();
     default:
         return QVariant();
@@ -235,6 +238,22 @@ void ClientModel::createClientList(bool partialReset)
         Window *desktopClient = tabBox->desktopClient();
         if (desktopClient) {
             m_mutableClientList.append(desktopClient);
+        }
+    }
+
+    Window *dc = tabBox->desktopClient();
+    if (dc && tabBox->config().clientApplicationsMode() != TabBoxConfig::AllWindowsCurrentApplication) {
+        const bool appendPlaceholder = m_mutableClientList.isEmpty() ||
+            !std::any_of(m_mutableClientList.cbegin(), m_mutableClientList.cend(), [](const Window *w) {
+                if(!w) {
+                  return false;
+                }
+
+                return w->resourceClass().compare(QLatin1String("org.kde.dolphin"), Qt::CaseInsensitive) == 0 || w->isDesktop();
+            });
+
+        if (appendPlaceholder) {
+            m_mutableClientList.append(dc);
         }
     }
 
