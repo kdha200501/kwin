@@ -15,6 +15,8 @@
 #include "gestures.h"
 #include "main.h"
 #include "utils/common.h"
+#include "window.h"
+#include "workspace.h"
 // KDE
 #if KWIN_BUILD_GLOBALSHORTCUTS
 #include <kglobalacceld.h>
@@ -183,6 +185,14 @@ void GlobalShortcutsManager::forceRegisterTouchscreenSwipe(SwipeDirection direct
 
 bool GlobalShortcutsManager::processKey(Qt::KeyboardModifiers mods, int keyQt, KeyboardKeyState state)
 {
+    if (Window *w = workspace()->activeWindow()) {
+        if (
+            w->resourceClass().compare(QLatin1String("org.kde.dolphin"), Qt::CaseInsensitive) == 0 &&
+            mods == Qt::AltModifier && keyQt == Qt::Key_F4
+        ) {
+            return false;
+        }
+    }
 #if KWIN_BUILD_GLOBALSHORTCUTS
     if (!m_kglobalAccel) {
         return false;
