@@ -255,7 +255,7 @@ TabBox::TabBox()
     m_defaultConfig = TabBoxConfig();
     m_defaultConfig.setClientDesktopMode(TabBoxConfig::OnlyCurrentDesktopClients);
     m_defaultConfig.setClientActivitiesMode(TabBoxConfig::OnlyCurrentActivityClients);
-    m_defaultConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsAllApplications);
+    m_defaultConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
     m_defaultConfig.setOrderMinimizedMode(TabBoxConfig::NoGroupByMinimized);
     m_defaultConfig.setClientMinimizedMode(TabBoxConfig::IgnoreMinimizedStatus);
     m_defaultConfig.setShowDesktopMode(TabBoxConfig::DoNotShowDesktopClient);
@@ -266,7 +266,7 @@ TabBox::TabBox()
     m_alternativeConfig = TabBoxConfig();
     m_alternativeConfig.setClientDesktopMode(TabBoxConfig::AllDesktopsClients);
     m_alternativeConfig.setClientActivitiesMode(TabBoxConfig::OnlyCurrentActivityClients);
-    m_alternativeConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsAllApplications);
+    m_alternativeConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
     m_alternativeConfig.setOrderMinimizedMode(TabBoxConfig::NoGroupByMinimized);
     m_alternativeConfig.setClientMinimizedMode(TabBoxConfig::IgnoreMinimizedStatus);
     m_alternativeConfig.setShowDesktopMode(TabBoxConfig::DoNotShowDesktopClient);
@@ -471,7 +471,9 @@ void TabBox::reconfigure()
     KConfigGroup config = c->group(QStringLiteral("TabBox"));
 
     loadConfig(c->group(QStringLiteral("TabBox")), m_defaultConfig);
+    m_defaultConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
     loadConfig(c->group(QStringLiteral("TabBoxAlternative")), m_alternativeConfig);
+    m_alternativeConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
 
     m_defaultCurrentApplicationConfig = m_defaultConfig;
     m_defaultCurrentApplicationConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsCurrentApplication);
@@ -995,11 +997,10 @@ void TabBox::accept(bool closeTabBox)
     if (closeTabBox) {
         close();
     }
-    if (c) {
+    if (c && c->isDesktop()) {
+        Workspace::self()->requestFocus(c);
+    } else if (c) {
         Workspace::self()->activateWindow(c);
-        if (c->isDesktop()) {
-            Workspace::self()->setShowingDesktop(!Workspace::self()->showingDesktop(), !m_defaultConfig.isHighlightWindows());
-        }
     }
 }
 
