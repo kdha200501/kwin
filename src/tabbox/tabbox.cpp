@@ -201,6 +201,11 @@ void TabBoxHandlerImpl::raiseClient(Window *c) const
     Workspace::self()->raiseWindow(c);
 }
 
+void TabBoxHandlerImpl::activateClient(Window *c) const
+{
+    Workspace::self()->activateWindow(c);
+}
+
 Window *TabBoxHandlerImpl::desktopClient() const
 {
     const auto stackingOrder = Workspace::self()->stackingOrder();
@@ -256,6 +261,7 @@ TabBox::TabBox()
     m_defaultConfig.setClientDesktopMode(TabBoxConfig::OnlyCurrentDesktopClients);
     m_defaultConfig.setClientActivitiesMode(TabBoxConfig::OnlyCurrentActivityClients);
     m_defaultConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
+    m_defaultConfig.setHighlightWindows(false);
     m_defaultConfig.setOrderMinimizedMode(TabBoxConfig::NoGroupByMinimized);
     m_defaultConfig.setClientMinimizedMode(TabBoxConfig::IgnoreMinimizedStatus);
     m_defaultConfig.setShowDesktopMode(TabBoxConfig::DoNotShowDesktopClient);
@@ -267,6 +273,7 @@ TabBox::TabBox()
     m_alternativeConfig.setClientDesktopMode(TabBoxConfig::AllDesktopsClients);
     m_alternativeConfig.setClientActivitiesMode(TabBoxConfig::OnlyCurrentActivityClients);
     m_alternativeConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
+    m_alternativeConfig.setHighlightWindows(false);
     m_alternativeConfig.setOrderMinimizedMode(TabBoxConfig::NoGroupByMinimized);
     m_alternativeConfig.setClientMinimizedMode(TabBoxConfig::IgnoreMinimizedStatus);
     m_alternativeConfig.setShowDesktopMode(TabBoxConfig::DoNotShowDesktopClient);
@@ -276,9 +283,13 @@ TabBox::TabBox()
 
     m_defaultCurrentApplicationConfig = m_defaultConfig;
     m_defaultCurrentApplicationConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsCurrentApplication);
+    m_defaultCurrentApplicationConfig.setHighlightWindows(false);
+    m_defaultCurrentApplicationConfig.setShowTabBox(false);
 
     m_alternativeCurrentApplicationConfig = m_alternativeConfig;
     m_alternativeCurrentApplicationConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsCurrentApplication);
+    m_alternativeCurrentApplicationConfig.setHighlightWindows(false);
+    m_alternativeCurrentApplicationConfig.setShowTabBox(false);
 
     m_tabBox = new TabBoxHandlerImpl(this);
     QTimer::singleShot(0, this, &TabBox::handlerReady);
@@ -472,13 +483,19 @@ void TabBox::reconfigure()
 
     loadConfig(c->group(QStringLiteral("TabBox")), m_defaultConfig);
     m_defaultConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
+    m_defaultConfig.setHighlightWindows(false);
     loadConfig(c->group(QStringLiteral("TabBoxAlternative")), m_alternativeConfig);
     m_alternativeConfig.setClientApplicationsMode(TabBoxConfig::OneWindowPerApplication);
+    m_alternativeConfig.setHighlightWindows(false);
 
     m_defaultCurrentApplicationConfig = m_defaultConfig;
     m_defaultCurrentApplicationConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsCurrentApplication);
+    m_defaultCurrentApplicationConfig.setHighlightWindows(false);
+    m_defaultCurrentApplicationConfig.setShowTabBox(false);
     m_alternativeCurrentApplicationConfig = m_alternativeConfig;
     m_alternativeCurrentApplicationConfig.setClientApplicationsMode(TabBoxConfig::AllWindowsCurrentApplication);
+    m_alternativeCurrentApplicationConfig.setHighlightWindows(false);
+    m_alternativeCurrentApplicationConfig.setShowTabBox(false);
 
     m_tabBox->setConfig(m_defaultConfig);
 
