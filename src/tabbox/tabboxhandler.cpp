@@ -381,6 +381,10 @@ void TabBoxHandler::setCurrentIndex(const QModelIndex &index)
     d->index = index;
     if (d->isHighlightWindows()) {
         d->updateHighlightWindows();
+    } else if (d->config.clientApplicationsMode() == TabBoxConfig::AllWindowsCurrentApplication) {
+        if (Window *c = client(index)) {
+            activateClient(c);
+        }
     }
     Q_EMIT selectedIndexChanged();
 }

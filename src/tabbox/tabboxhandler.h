@@ -126,6 +126,11 @@ public:
      */
     virtual void raiseClient(Window *c) const = 0;
 
+    /**
+     * Activate a client (raise + focus)
+     */
+    virtual void activateClient(Window *c) const = 0;
+
     virtual void highlightWindows(Window *window = nullptr, QWindow *controller = nullptr) = 0;
 
     /**

@@ -52,6 +52,7 @@ public:
     bool isInFocusChain(Window *client) const override;
     QList<Window *> stackingOrder() const override;
     void raiseClient(Window *client) const override;
+    void activateClient(Window *client) const override;
     Window *clientToAddToList(Window *client) const override;
     Window *desktopClient() const override;
     void activateAndClose() override;
