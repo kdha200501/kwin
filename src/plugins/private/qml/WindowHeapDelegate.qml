@@ -371,13 +371,31 @@ ExpoCell {
 
             sourceComponent: PC3.Button {
                 text: i18ndc("kwin", "@info:tooltip as in: 'close this window'", "Close window")
+                readonly property real btnSize: Kirigami.Units.iconSizes.sizeForLabels + Kirigami.Units.largeSpacing * 2
+                width: btnSize
+                height: btnSize
+                flat: true
+                hoverEnabled: false
+                padding: 0
+                leftPadding: 0
+                rightPadding: 0
+                topPadding: 0
+                bottomPadding: 0
                 icon.name: "window-close"
+                icon.width: btnSize
+                icon.height: btnSize
                 display: PC3.AbstractButton.IconOnly
 
                 PC3.ToolTip.text: text
                 PC3.ToolTip.visible: hovered && display === PC3.AbstractButton.IconOnly
                 PC3.ToolTip.delay: Kirigami.Units.toolTipDelay
                 Accessible.name: text
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    cursorShape: Qt.PointingHandCursor
+                }
 
                 onClicked: thumb.window.closeWindow();
             }
