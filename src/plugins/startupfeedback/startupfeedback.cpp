@@ -115,25 +115,13 @@ bool StartupFeedbackEffect::supported()
 
 void StartupFeedbackEffect::reconfigure(Effect::ReconfigureFlags flags)
 {
-    KConfigGroup c = m_configWatcher->config()->group(QStringLiteral("FeedbackStyle"));
-    const bool busyCursor = c.readEntry("BusyCursor", true);
-
-    c = m_configWatcher->config()->group(QStringLiteral("BusyCursorSettings"));
+    KConfigGroup c = m_configWatcher->config()->group(QStringLiteral("BusyCursorSettings"));
     m_timeout = std::chrono::seconds(c.readEntry("Timeout", s_startupDefaultTimeout));
 #if KWIN_BUILD_X11
     m_startupInfo->setTimeout(m_timeout.count());
 #endif
-    const bool busyBlinking = c.readEntry("Blinking", false);
-    const bool busyBouncing = c.readEntry("Bouncing", true);
-    if (!busyCursor) {
-        m_type = NoFeedback;
-    } else if (busyBouncing) {
-        m_type = BouncingFeedback;
-    } else if (busyBlinking) {
-        m_type = BlinkingFeedback;
-    } else {
-        m_type = PassiveFeedback;
-    }
+    // Cursor feedback is hardcoded to None; saved settings are ignored.
+    m_type = NoFeedback;
     if (m_active) {
         stop();
         start(m_startups[m_currentStartup]);
