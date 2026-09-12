@@ -195,35 +195,15 @@ static DnDAction chooseDndAction(AbstractDataSource *source, DataOfferInterface 
         }
     }
 
-    // then the compositor picks an action if modifiers are pressed and it's supported both sides
-    if (keyboardModifiers.testFlag(Qt::ControlModifier)) {
-        if (source->supportedDragAndDropActions().testFlag(DnDAction::Copy) && offer->supportedDragAndDropActions().has_value() && offer->supportedDragAndDropActions()->testFlag(DnDAction::Copy)) {
-            return DnDAction::Copy;
-        }
+    // then the compositor picks an action from the pressed modifiers (jacks customization):
+    // Alt+Ctrl -> link (symlink), Alt -> copy, anything else -> move
+    if (keyboardModifiers.testFlag(Qt::AltModifier) && keyboardModifiers.testFlag(Qt::ControlModifier)) {
+        return DnDAction::Link;
     }
-    if (keyboardModifiers.testFlag(Qt::ShiftModifier)) {
-        if (source->supportedDragAndDropActions().testFlag(DnDAction::Move) && offer->supportedDragAndDropActions().has_value() && offer->supportedDragAndDropActions()->testFlag(DnDAction::Move)) {
-            return DnDAction::Move;
-        }
+    if (keyboardModifiers.testFlag(Qt::AltModifier)) {
+        return DnDAction::Copy;
     }
-
-    // otherwise we pick the preferred action from the target if the source supported it
-    if (offer->preferredDragAndDropAction().has_value()) {
-        if (source->supportedDragAndDropActions().testFlag(*offer->preferredDragAndDropAction())) {
-            return *offer->preferredDragAndDropAction();
-        }
-    }
-
-    // finally pick something everyone supports in a deterministic fashion
-    if (offer->supportedDragAndDropActions().has_value()) {
-        for (const DnDAction action : {DnDAction::Copy, DnDAction::Move, DnDAction::Ask}) {
-            if (source->supportedDragAndDropActions().testFlag(action) && offer->supportedDragAndDropActions()->testFlag(action)) {
-                return action;
-            }
-        }
-    }
-
-    return DnDAction::None;
+    return DnDAction::Move;
 }
 
 void DataDeviceInterface::updateDragTarget(SurfaceInterface *surface, const QPointF &position, quint32 serial)
