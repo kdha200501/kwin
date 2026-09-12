@@ -195,35 +195,33 @@ static DnDAction chooseDndAction(AbstractDataSource *source, DataOfferInterface 
         }
     }
 
-    // then the compositor picks an action if modifiers are pressed and it's supported both sides
+    // then the compositor maps the pressed key modifiers to a glyph (jacks customization):
+    // Alt+Ctrl -> link (symlink), Alt -> copy, Ctrl -> move.  When ANY modifier is
+    // held we override the target's preferred action, so the user can always force
+    // the desired action regardless of what the destination suggested.
+    if (keyboardModifiers.testFlag(Qt::AltModifier) && keyboardModifiers.testFlag(Qt::ControlModifier)) {
+        return DnDAction::Link;
+    }
+    if (keyboardModifiers.testFlag(Qt::AltModifier)) {
+        return DnDAction::Copy;
+    }
     if (keyboardModifiers.testFlag(Qt::ControlModifier)) {
-        if (source->supportedDragAndDropActions().testFlag(DnDAction::Copy) && offer->supportedDragAndDropActions().has_value() && offer->supportedDragAndDropActions()->testFlag(DnDAction::Copy)) {
-            return DnDAction::Copy;
-        }
+        return DnDAction::Move;
     }
-    if (keyboardModifiers.testFlag(Qt::ShiftModifier)) {
-        if (source->supportedDragAndDropActions().testFlag(DnDAction::Move) && offer->supportedDragAndDropActions().has_value() && offer->supportedDragAndDropActions()->testFlag(DnDAction::Move)) {
-            return DnDAction::Move;
+
+    // then the compositor honors the drag target's preferred action (the target, e.g.
+    // KIO Dolphin views, has already made a same-device-aware decision and negotiated
+    // it via wl_data_offer.set_actions).  Only reachable when no modifier is pressed,
+    // so this is the only place the user's "unmodified drag" gets its glyph from the
+    // destination's choice (Move on same device, Copy on cross-device).
+    if (const auto preferred = offer->preferredDragAndDropAction()) {
+        if (preferred && offer->supportedDragAndDropActions().has_value() && offer->supportedDragAndDropActions()->testFlag(*preferred)) {
+            return *preferred;
         }
     }
 
-    // otherwise we pick the preferred action from the target if the source supported it
-    if (offer->preferredDragAndDropAction().has_value()) {
-        if (source->supportedDragAndDropActions().testFlag(*offer->preferredDragAndDropAction())) {
-            return *offer->preferredDragAndDropAction();
-        }
-    }
-
-    // finally pick something everyone supports in a deterministic fashion
-    if (offer->supportedDragAndDropActions().has_value()) {
-        for (const DnDAction action : {DnDAction::Copy, DnDAction::Move, DnDAction::Ask}) {
-            if (source->supportedDragAndDropActions().testFlag(action) && offer->supportedDragAndDropActions()->testFlag(action)) {
-                return action;
-            }
-        }
-    }
-
-    return DnDAction::None;
+    // default: move
+    return DnDAction::Move;
 }
 
 void DataDeviceInterface::updateDragTarget(SurfaceInterface *surface, const QPointF &position, quint32 serial)
