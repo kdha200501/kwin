@@ -1187,6 +1187,9 @@ void CursorImage::updateDragCursor()
         case DnDAction::Move:
             m_dragCursor->setShape(Qt::DragMoveCursor);
             break;
+        case DnDAction::Link:
+            m_dragCursor->setShape(Qt::DragLinkCursor);
+            break;
         case DnDAction::Ask:
             // Cursor themes don't have anything better in the themes yet
             // a dnd-drag-ask is proposed

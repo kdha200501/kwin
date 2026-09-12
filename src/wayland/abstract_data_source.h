@@ -24,6 +24,7 @@ enum class DnDAction {
     Copy = 1 << 0,
     Move = 1 << 1,
     Ask = 1 << 2,
+    Link = 1 << 3,
 };
 Q_DECLARE_FLAGS(DnDActions, DnDAction)
 
