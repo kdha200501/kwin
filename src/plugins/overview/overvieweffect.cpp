@@ -34,6 +34,7 @@ OverviewEffect::OverviewEffect()
 {
     auto gesture = new EffectTogglableGesture(m_overviewState);
     gesture->addTouchpadSwipeGesture(SwipeDirection::Up, 4);
+    gesture->addTouchpadPinchGesture(PinchDirection::Contracting, 5);
     gesture->addTouchscreenSwipeGesture(SwipeDirection::Up, 3);
 
     auto transitionGesture = new EffectTogglableGesture(m_transitionState);
