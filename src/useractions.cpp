@@ -27,6 +27,7 @@
 
 #include "core/output.h"
 #include "cursor.h"
+#include "globalshortcuts.h"
 #include "input.h"
 #include "options.h"
 #include "pointer_input.h"
@@ -984,6 +985,17 @@ void Workspace::initShortcuts()
 
     initShortcut("Show Desktop", i18n("Peek at Desktop"),
                  Qt::META | Qt::Key_D, &Workspace::slotToggleShowDesktop, false);
+
+    // 5-finger swipe down toggles Show Desktop. This is deliberately a swipe rather than
+    // a pinch: the 5-finger pinch gesture space (contracting/expanding) is already used by
+    // the Overview effect to enter Overview / Desktop Grid, so a swipe on a different axis
+    // avoids both gestures firing at once. Reuses the standard touchpad gesture commit/
+    // cancel physics from GestureRecognizer (SwipeGesture::minimumDeltaReached).
+    auto showDesktopSwipeAction = new QAction(this);
+    showDesktopSwipeAction->setObjectName(QStringLiteral("Show Desktop (touchpad swipe)"));
+    showDesktopSwipeAction->setProperty("componentName", QStringLiteral("kwin"));
+    connect(showDesktopSwipeAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
+    input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopSwipeAction);
 
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
 
