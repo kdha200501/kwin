@@ -34,7 +34,6 @@ OverviewEffect::OverviewEffect()
 {
     auto gesture = new EffectTogglableGesture(m_overviewState);
     gesture->addTouchpadSwipeGesture(SwipeDirection::Up, 4);
-    gesture->addTouchpadPinchGesture(PinchDirection::Contracting, 5);
     gesture->addTouchscreenSwipeGesture(SwipeDirection::Up, 3);
 
     auto transitionGesture = new EffectTogglableGesture(m_transitionState);
@@ -44,7 +43,6 @@ OverviewEffect::OverviewEffect()
 
     auto gridGesture = new EffectTogglableGesture(m_gridState);
     gridGesture->addTouchpadSwipeGesture(SwipeDirection::Down, 4);
-    gridGesture->addTouchpadPinchGesture(PinchDirection::Expanding, 5);
     gridGesture->addTouchscreenSwipeGesture(SwipeDirection::Down, 3);
 
     connect(m_overviewState, &EffectTogglableState::inProgressChanged, this, &OverviewEffect::overviewGestureInProgressChanged);

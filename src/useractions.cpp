@@ -986,16 +986,18 @@ void Workspace::initShortcuts()
     initShortcut("Show Desktop", i18n("Peek at Desktop"),
                  Qt::META | Qt::Key_D, &Workspace::slotToggleShowDesktop, false);
 
-    // 5-finger swipe down toggles Show Desktop. This is deliberately a swipe rather than
-    // a pinch: the 5-finger pinch gesture space (contracting/expanding) is already used by
-    // the Overview effect to enter Overview / Desktop Grid, so a swipe on a different axis
-    // avoids both gestures firing at once. Reuses the standard touchpad gesture commit/
-    // cancel physics from GestureRecognizer (SwipeGesture::minimumDeltaReached).
-    auto showDesktopSwipeAction = new QAction(this);
-    showDesktopSwipeAction->setObjectName(QStringLiteral("Show Desktop (touchpad swipe)"));
-    showDesktopSwipeAction->setProperty("componentName", QStringLiteral("kwin"));
-    connect(showDesktopSwipeAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
-    input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopSwipeAction);
+    // 5-finger contracting pinch and 5-finger swipe down both toggle Show Desktop.
+    // The Overview effect no longer claims any 5-finger pinch gesture, so this is the
+    // sole owner of that gesture space. Reuses the standard touchpad gesture commit/
+    // cancel physics from GestureRecognizer (SwipeGesture::minimumDeltaReached /
+    // PinchGesture::minimumScaleDeltaReached decide whether the gesture triggers or
+    // snaps back when fingers are lifted).
+    auto showDesktopGestureAction = new QAction(this);
+    showDesktopGestureAction->setObjectName(QStringLiteral("Show Desktop (touchpad gesture)"));
+    showDesktopGestureAction->setProperty("componentName", QStringLiteral("kwin"));
+    connect(showDesktopGestureAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
+    input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopGestureAction);
+    input()->shortcuts()->registerTouchpadPinch(PinchDirection::Contracting, 5, showDesktopGestureAction);
 
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
 
