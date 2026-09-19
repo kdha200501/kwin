@@ -27,6 +27,7 @@
 
 #include "core/output.h"
 #include "cursor.h"
+#include "gestures.h"
 #include "globalshortcuts.h"
 #include "input.h"
 #include "options.h"
@@ -986,18 +987,43 @@ void Workspace::initShortcuts()
     initShortcut("Show Desktop", i18n("Peek at Desktop"),
                  Qt::META | Qt::Key_D, &Workspace::slotToggleShowDesktop, false);
 
-    // 5-finger contracting pinch and 5-finger swipe down both toggle Show Desktop.
-    // The Overview effect no longer claims any 5-finger pinch gesture, so this is the
-    // sole owner of that gesture space. Reuses the standard touchpad gesture commit/
-    // cancel physics from GestureRecognizer (SwipeGesture::minimumDeltaReached /
-    // PinchGesture::minimumScaleDeltaReached decide whether the gesture triggers or
-    // snaps back when fingers are lifted).
-    auto showDesktopGestureAction = new QAction(this);
-    showDesktopGestureAction->setObjectName(QStringLiteral("Show Desktop (touchpad gesture)"));
-    showDesktopGestureAction->setProperty("componentName", QStringLiteral("kwin"));
-    connect(showDesktopGestureAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
-    input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopGestureAction);
-    input()->shortcuts()->registerTouchpadPinch(PinchDirection::Contracting, 5, showDesktopGestureAction);
+    // 5-finger swipe down toggles Show Desktop as a simple, non-interactive shortcut.
+    auto showDesktopSwipeAction = new QAction(this);
+    showDesktopSwipeAction->setObjectName(QStringLiteral("Show Desktop (touchpad swipe)"));
+    showDesktopSwipeAction->setProperty("componentName", QStringLiteral("kwin"));
+    connect(showDesktopSwipeAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
+    input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopSwipeAction);
+
+    // 5-finger pinch out (Expanding) shows the desktop; pinch in (Contracting) reverses
+    // it. These use PinchGesture objects directly, rather than the simpler
+    // registerTouchpadPinch(direction, fingerCount, action, progressCallback) overload,
+    // so we can react specifically to PinchGesture::triggered(). GestureRecognizer only
+    // emits triggered() once, when the fingers are actually lifted AND the 20% scale
+    // threshold (PinchGesture::s_minimumScaleDelta) was reached in that direction.
+    // PinchGesture::cancelled() is deliberately *not* used to decide anything here: it
+    // also fires transiently whenever the pinch briefly reverses direction mid-gesture
+    // (e.g. natural hand wobble around the neutral point in GestureRecognizer::
+    // updatePinchGesture()), not just on a genuine end. Treating every cancelled() as a
+    // commit/revert decision - as a naive shared QAction bound to both signals would -
+    // caused Show Desktop to intermittently activate for an instant and immediately
+    // undo itself. Live interactive progress (the actual window animation following
+    // finger movement in real time) is driven separately by the "windowaperture" effect
+    // via ScriptedEffect::registerTouchpadPinchGesture().
+    auto showDesktopPinchExpand = new PinchGesture(5);
+    showDesktopPinchExpand->setParent(this);
+    showDesktopPinchExpand->setDirection(PinchDirection::Expanding);
+    connect(showDesktopPinchExpand, &PinchGesture::triggered, this, [this]() {
+        setShowingDesktop(true);
+    });
+    input()->shortcuts()->registerTouchpadPinch(showDesktopPinchExpand);
+
+    auto showDesktopPinchContract = new PinchGesture(5);
+    showDesktopPinchContract->setParent(this);
+    showDesktopPinchContract->setDirection(PinchDirection::Contracting);
+    connect(showDesktopPinchContract, &PinchGesture::triggered, this, [this]() {
+        setShowingDesktop(false);
+    });
+    input()->shortcuts()->registerTouchpadPinch(showDesktopPinchContract);
 
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
 

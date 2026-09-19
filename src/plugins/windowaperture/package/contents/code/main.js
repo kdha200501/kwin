@@ -13,11 +13,22 @@
 var badBadWindowsEffect = {
     duration: animationTime(250),
     showingDesktop: false,
+    // Live preview state for the 5-finger touchpad pinch gesture (see
+    // touchpadPinchStep/touchpadPinchEnded below and their registration in init()).
+    // touchpadPinchFraction tracks live preview progress towards the "showing
+    // desktop" state: 0 = normal windows, 1 = fully off to corners (desktop shown).
+    // A new gesture always starts from whatever fraction was last committed or
+    // previewed, and is kept in sync with the authoritative showingDesktop state
+    // (set elsewhere, in Workspace, based on PinchGesture::triggered()) via
+    // setShowingDesktop below.
+    touchpadPinchFraction: 0,
+    lastTouchpadPinchProgress: 0,
     loadConfig: function () {
         badBadWindowsEffect.duration = animationTime(250);
     },
     setShowingDesktop: function (showing) {
         badBadWindowsEffect.showingDesktop = showing;
+        badBadWindowsEffect.touchpadPinchFraction = showing ? 1 : 0;
     },
     offToCorners: function (showing, frozenTime) {
         if (typeof frozenTime === "undefined") {
@@ -216,11 +227,50 @@ var badBadWindowsEffect = {
 
         badBadWindowsEffect.offToCorners(true, time)
     },
+    // Preview the "showing desktop" transition frozen at a given fraction
+    // (0.0 = normal windows, 1.0 = fully off to corners/desktop shown), used by
+    // both the touch-edge drag (realtimeScreenEdgeCallback above) and the
+    // 5-finger touchpad pinch (touchpadPinchStep below).
+    previewShowingDesktop: function (fraction) {
+        var time = Math.min(1, Math.max(0, fraction)) * badBadWindowsEffect.duration;
+        badBadWindowsEffect.offToCorners(true, time);
+    },
+    // sign is +1 for the Expanding (pinch-out) gesture, which previews towards
+    // showing the desktop, and -1 for Contracting (pinch-in), which previews
+    // towards restoring the windows. progress is the raw, unclamped value from
+    // PinchGesture::progress() for whichever direction is currently active; only
+    // its *change* since the last call is meaningful (see ZoomEffect for the same
+    // technique), since progress resets whenever GestureRecognizer starts a new
+    // PinchGesture instance (e.g. when the active direction flips).
+    touchpadPinchStep: function (progress, sign) {
+        var clamped = Math.min(1, progress);
+        var delta = clamped - badBadWindowsEffect.lastTouchpadPinchProgress;
+        badBadWindowsEffect.lastTouchpadPinchProgress = clamped;
+        badBadWindowsEffect.touchpadPinchFraction = Math.min(1, Math.max(0,
+            badBadWindowsEffect.touchpadPinchFraction + sign * delta));
+        badBadWindowsEffect.previewShowingDesktop(badBadWindowsEffect.touchpadPinchFraction);
+    },
+    touchpadPinchEnded: function () {
+        badBadWindowsEffect.lastTouchpadPinchProgress = 0;
+        // The actual Show Desktop state commit is decided independently, in
+        // Workspace (KWin core), based on PinchGesture::triggered(); this just
+        // resettles our live preview to whatever that authoritative state ends
+        // up being (kept up to date via setShowingDesktop/showingDesktopChanged).
+        badBadWindowsEffect.previewShowingDesktop(badBadWindowsEffect.showingDesktop ? 1 : 0);
+    },
     init: function () {
         badBadWindowsEffect.loadConfig();
         effects.showingDesktopChanged.connect(badBadWindowsEffect.setShowingDesktop);
         effects.showingDesktopChanged.connect(badBadWindowsEffect.offToCorners);
         effect.animationEnded.connect(badBadWindowsEffect.animationEnded);
+
+        // KWin::PinchDirection: 0 = Expanding, 1 = Contracting
+        registerTouchpadPinchGesture(0, 5,
+            function (progress) { badBadWindowsEffect.touchpadPinchStep(progress, 1); },
+            badBadWindowsEffect.touchpadPinchEnded);
+        registerTouchpadPinchGesture(1, 5,
+            function (progress) { badBadWindowsEffect.touchpadPinchStep(progress, -1); },
+            badBadWindowsEffect.touchpadPinchEnded);
 
         let edges = effect.touchEdgesForAction("show-desktop");
 
