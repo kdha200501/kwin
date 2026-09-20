@@ -146,6 +146,8 @@ EffectsHandler::EffectsHandler(Compositor *compositor, WorkspaceScene *scene)
             Q_EMIT showingDesktopChanged(showing);
         }
     });
+    connect(ws, &Workspace::showingDesktopFactorChanged, this, &EffectsHandler::showingDesktopFactorChanged);
+    connect(ws, &Workspace::showingDesktopFactorSettled, this, &EffectsHandler::showingDesktopFactorSettled);
     connect(ws, &Workspace::currentDesktopChanged, this, [this](VirtualDesktop *old, VirtualDesktop *newDesktop, LogicalOutput *output, Window *window) {
         Q_EMIT desktopChanged(old, newDesktop, window ? window->effectWindow() : nullptr, output);
     });

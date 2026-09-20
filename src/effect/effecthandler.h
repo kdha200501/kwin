@@ -827,6 +827,25 @@ Q_SIGNALS:
      */
     void showingDesktopChanged(bool);
     /**
+     * Signal emitted whenever the continuous "showing desktop" progress
+     * (Workspace::showingDesktopFactor(), in [0.0, 1.0]) changes, including
+     * during gesture-driven live previews, not only on commit.
+     * @since 6.8
+     */
+    void showingDesktopFactorChanged(qreal factor);
+    /**
+     * Signal emitted whenever a gesture driving showingDesktopFactor() ends
+     * (whether completed or cancelled), regardless of whether the boolean
+     * "showing desktop" state actually changes as a result. Unlike
+     * showingDesktopChanged() (only emitted on an actual transition), this
+     * always fires, so effects that need to play a real, timed "settle to
+     * @p showing" animation have a reliable trigger even when the gesture
+     * just re-affirms the state it started from (e.g. it was aborted before
+     * crossing the halfway point).
+     * @since 6.8
+     */
+    void showingDesktopFactorSettled(bool showing);
+    /**
      * Signal emitted when a new window has been added to the Workspace.
      * @param w The added window
      * @since 4.7

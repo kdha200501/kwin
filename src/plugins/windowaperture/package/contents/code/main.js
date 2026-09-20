@@ -33,7 +33,14 @@ var badBadWindowsEffect = {
             for (var i = 0; i < stackingOrder.length; ++i) {
                 var w = stackingOrder[i];
 
-                if (!w.hiddenByShowDesktop) {
+                // A window is a participant if it would be shown away when the
+                // desktop is shown. Use breaksShowingDesktop (the same predicate
+                // the core uses to decide which windows get hidden) rather than
+                // hiddenByShowDesktop: the latter is only set once the boolean
+                // "showing desktop" state is committed, so gating on it would
+                // skip every window during a live gesture-driven preview, and
+                // the animation would only begin at the end of the gesture.
+                if (!w.breaksShowingDesktop) {
                     continue;
                 }
 
@@ -156,6 +163,17 @@ var badBadWindowsEffect = {
                             frozenTime: frozenTime
                         }]
                     });
+                } else {
+                    // freezeInTime() only pokes the existing animation's internal
+                    // elapsed time; unlike set()/animate() it does not itself
+                    // schedule a repaint. If this animation had already gone idle
+                    // (e.g. a previous gesture ran it to completion and the
+                    // compositor stopped repainting it), reusing it here would
+                    // otherwise update its state invisibly until some unrelated
+                    // event forces a repaint, making the window jump straight to
+                    // its new position instead of animating. Explicitly request a
+                    // repaint so every scrubbed frame is actually painted.
+                    effects.addRepaintFull();
                 }
             } else {
                 // Reset if the window has become invisible in the meantime
@@ -179,6 +197,11 @@ var badBadWindowsEffect = {
                             from: 0.0
                         }]
                     });
+                } else {
+                    // Same reasoning as above: redirect()/freezeInTime() reused an
+                    // existing (possibly idle) animation without scheduling a
+                    // repaint, so force one.
+                    effects.addRepaintFull();
                 }
             }
         }
@@ -216,11 +239,34 @@ var badBadWindowsEffect = {
 
         badBadWindowsEffect.offToCorners(true, time)
     },
+    // Preview the "showing desktop" transition frozen at a given fraction
+    // (0.0 = normal windows, 1.0 = fully off to corners/desktop shown), used by
+    // both the touch-edge drag (realtimeScreenEdgeCallback above) and the
+    // 5-finger touchpad pinch, driven directly off Workspace::showingDesktopFactor
+    // via effects.showingDesktopFactorChanged (see init() below) - the core is the
+    // single source of truth for that fraction, so there is no JS-local state to
+    // keep in sync here any more.
+    previewShowingDesktop: function (fraction) {
+        var time = Math.min(1, Math.max(0, fraction)) * badBadWindowsEffect.duration;
+        badBadWindowsEffect.offToCorners(true, time);
+    },
+    // Called whenever a gesture driving the live preview above ends (completed
+    // or cancelled), even if it didn't actually flip the showingDesktop state
+    // (e.g. it was aborted before crossing the halfway point, un-doing back to
+    // where it started). offToCorners(showing, -1) unfreezes whichever
+    // animation the live scrub left in place and lets it play out for real
+    // (in real time, from wherever it currently is) towards its target,
+    // instead of leaving it frozen mid-way with no further motion.
+    settleShowingDesktop: function (showing) {
+        badBadWindowsEffect.offToCorners(showing, -1);
+    },
     init: function () {
         badBadWindowsEffect.loadConfig();
         effect.configChanged.connect(badBadWindowsEffect.loadConfig);
         effects.showingDesktopChanged.connect(badBadWindowsEffect.setShowingDesktop);
         effects.showingDesktopChanged.connect(badBadWindowsEffect.offToCorners);
+        effects.showingDesktopFactorChanged.connect(badBadWindowsEffect.previewShowingDesktop);
+        effects.showingDesktopFactorSettled.connect(badBadWindowsEffect.settleShowingDesktop);
         effect.animationEnded.connect(badBadWindowsEffect.animationEnded);
 
         let edges = effect.touchEdgesForAction("show-desktop");
