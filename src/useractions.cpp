@@ -25,8 +25,13 @@
 
 #include "config-kwin.h"
 
+#include <algorithm>
+#include <memory>
+
 #include "core/output.h"
 #include "cursor.h"
+#include "gestures.h"
+#include "globalshortcuts.h"
 #include "input.h"
 #include "options.h"
 #include "pointer_input.h"
@@ -984,6 +989,70 @@ void Workspace::initShortcuts()
 
     initShortcut("Show Desktop", i18n("Peek at Desktop"),
                  Qt::META | Qt::Key_D, &Workspace::slotToggleShowDesktop, false);
+
+    // 5-finger swipe down toggles Show Desktop as a simple, non-interactive shortcut.
+    // Disabled: only the 5-finger pinch (below) is a 5-finger gesture.
+    // auto showDesktopSwipeAction = new QAction(this);
+    // showDesktopSwipeAction->setObjectName(QStringLiteral("Show Desktop (touchpad swipe)"));
+    // showDesktopSwipeAction->setProperty("componentName", QStringLiteral("kwin"));
+    // connect(showDesktopSwipeAction, &QAction::triggered, this, &Workspace::slotToggleShowDesktop);
+    // input()->shortcuts()->registerTouchpadSwipe(SwipeDirection::Down, 5, showDesktopSwipeAction);
+
+    // 5-finger pinch out (Expanding) shows the desktop; pinch in (Contracting) reverses
+    // it. Workspace::showingDesktopFactor() (0..1) is the single, continuously-updated
+    // source of truth for how far along the gesture is, mirroring the Overview effect's
+    // EffectTogglableState::partialActivationFactor model. Each direction's
+    // PinchGesture::progress() reports |scale-1|/PinchGesture::s_minimumScaleDelta for
+    // whichever direction is currently active (see GestureRecognizer::updatePinchGesture
+    // in gestures.cpp); only the *change* since the last sample is meaningful, since that
+    // value keeps counting from wherever the scale currently is, not from a fixed origin.
+    // We therefore integrate deltas into the shared factor (same technique as the
+    // "windowaperture" effect's touchpadPinchStep, which drives the live corner-preview
+    // animation off the very same PinchGesture::progress signal). The delta integrator is
+    // reset on PinchGesture::started(), which both directions receive together whenever a
+    // fresh 5-finger touch begins (GestureRecognizer::startPinchGesture), so switching
+    // which direction is "active" mid-gesture can't reintroduce stale deltas.
+    //
+    // On release, both PinchGesture::triggered() (the 20%-scale-delta threshold was
+    // reached) and PinchGesture::cancelled() (it wasn't, or the pinch ended pointing the
+    // other way) commit via Workspace::commitShowingDesktopFromFactor(), which just snaps
+    // to whichever side of 0.5 the accumulated factor is already on. This makes the
+    // transient cancelled() emissions that happen on ordinary hand wobble around the
+    // neutral point harmless: they no longer have a chance to flip the state by
+    // themselves, they merely re-affirm the side the gesture has actually reached.
+    auto showDesktopPinchProgress = std::make_shared<qreal>(0);
+
+    auto showDesktopPinchExpand = new PinchGesture(5);
+    showDesktopPinchExpand->setParent(this);
+    showDesktopPinchExpand->setDirection(PinchDirection::Expanding);
+    connect(showDesktopPinchExpand, &PinchGesture::started, this, [showDesktopPinchProgress]() {
+        *showDesktopPinchProgress = 0;
+    });
+    connect(showDesktopPinchExpand, &PinchGesture::progress, this, [this, showDesktopPinchProgress](qreal progress) {
+        const qreal clamped = std::min(1.0, progress);
+        const qreal delta = clamped - *showDesktopPinchProgress;
+        *showDesktopPinchProgress = clamped;
+        setShowingDesktopFactor(showingDesktopFactor() + delta);
+    });
+    connect(showDesktopPinchExpand, &PinchGesture::triggered, this, &Workspace::commitShowingDesktopFromFactor);
+    connect(showDesktopPinchExpand, &PinchGesture::cancelled, this, &Workspace::commitShowingDesktopFromFactor);
+    input()->shortcuts()->registerTouchpadPinch(showDesktopPinchExpand);
+
+    auto showDesktopPinchContract = new PinchGesture(5);
+    showDesktopPinchContract->setParent(this);
+    showDesktopPinchContract->setDirection(PinchDirection::Contracting);
+    connect(showDesktopPinchContract, &PinchGesture::started, this, [showDesktopPinchProgress]() {
+        *showDesktopPinchProgress = 0;
+    });
+    connect(showDesktopPinchContract, &PinchGesture::progress, this, [this, showDesktopPinchProgress](qreal progress) {
+        const qreal clamped = std::min(1.0, progress);
+        const qreal delta = clamped - *showDesktopPinchProgress;
+        *showDesktopPinchProgress = clamped;
+        setShowingDesktopFactor(showingDesktopFactor() - delta);
+    });
+    connect(showDesktopPinchContract, &PinchGesture::triggered, this, &Workspace::commitShowingDesktopFromFactor);
+    connect(showDesktopPinchContract, &PinchGesture::cancelled, this, &Workspace::commitShowingDesktopFromFactor);
+    input()->shortcuts()->registerTouchpadPinch(showDesktopPinchContract);
 
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
 

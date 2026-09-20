@@ -595,6 +595,11 @@ bool Window::belongsToDesktop() const
     return false;
 }
 
+bool Window::breaksShowingDesktop() const
+{
+    return !(isUnmanaged() || isDock() || isDesktop() || belongsToDesktop() || isInputMethod());
+}
+
 void Window::setKeepAbove(bool b)
 {
     b = rules()->checkKeepAbove(b);

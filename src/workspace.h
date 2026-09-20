@@ -22,6 +22,7 @@
 // KF
 #include <netwm_def.h>
 // Qt
+#include <QElapsedTimer>
 #include <QList>
 #include <QStringList>
 #include <QTimer>
@@ -338,6 +339,30 @@ public:
     void setShowingDesktop(bool showing, bool animated = true);
     bool showingDesktop() const;
 
+    /**
+     * Continuous "showing desktop" progress, in [0.0, 1.0]. 0.0 means normal
+     * windows, 1.0 means the desktop is fully shown. This is the single source
+     * of truth for gesture-driven previews (e.g. the 5-finger touchpad pinch);
+     * @ref showingDesktop() is a thin wrapper reporting whether the factor is
+     * past the halfway point.
+     */
+    qreal showingDesktopFactor() const;
+    /**
+     * Sets the continuous "showing desktop" progress (clamped to [0.0, 1.0])
+     * without committing the boolean showingDesktop() state. Used to drive
+     * live previews, e.g. from a touchpad pinch gesture's progress callback.
+     */
+    void setShowingDesktopFactor(qreal factor);
+    /**
+     * Commits the boolean showingDesktop() state based on which side of 0.5
+     * the current showingDesktopFactor() is on. Intended to be called when a
+     * gesture driving setShowingDesktopFactor() ends (whether it completed or
+     * was cancelled), so that transient mid-gesture cancellations are
+     * harmless: they just re-affirm whichever side of 0.5 the factor is
+     * already on instead of prematurely toggling the state.
+     */
+    void commitShowingDesktopFromFactor();
+
     void setActiveWindow(Window *window);
 #if KWIN_BUILD_X11
     void removeX11Window(X11Window *); // Only called from X11Window::destroyWindow() or X11Window::releaseWindow()
@@ -565,6 +590,23 @@ Q_SIGNALS:
     void deletedRemoved(KWin::Window *);
     void configChanged();
     void showingDesktopChanged(bool showing, bool animated);
+    /**
+     * Emitted whenever showingDesktopFactor() changes, including during
+     * gesture-driven live previews (i.e. not only on a boolean transition).
+     */
+    void showingDesktopFactorChanged(qreal factor);
+    /**
+     * Emitted whenever commitShowingDesktopFromFactor() runs, i.e. whenever a
+     * gesture driving showingDesktopFactor() ends (whether completed or
+     * cancelled), regardless of whether the boolean showingDesktop() state
+     * actually changes as a result. Unlike showingDesktopChanged() (which is
+     * only emitted on an actual transition), this always fires, so consumers
+     * that need to play a real, timed "settle to @p showing" animation (e.g.
+     * the windowaperture effect finishing a live scrub that was aborted
+     * before crossing the halfway point) have a reliable trigger even when
+     * the gesture just re-affirms the state it started from.
+     */
+    void showingDesktopFactorSettled(bool showing);
     void outputOrderChanged();
     void outputAdded(KWin::LogicalOutput *);
     void outputRemoved(KWin::LogicalOutput *);
@@ -634,6 +676,14 @@ private:
 
     bool breaksShowingDesktop(Window *window) const;
 
+    // Ramps showingDesktopFactor() from its current value to @p target linearly
+    // over animationTime(s_showingDesktopFactorBaseDuration), emitting
+    // showingDesktopFactorChanged() on every step. Used by the keyboard "Peek at
+    // desktop" shortcut so the factor animates just like the expose/overview
+    // effect's partialActivationFactor does when toggled from a shortcut.
+    void animateShowingDesktopFactor(qreal target);
+    void showDesktopFactorTick();
+
     struct Constraint
     {
         Window *below;
@@ -673,6 +723,17 @@ private:
     bool force_restacking;
 
     bool showing_desktop;
+    qreal showing_desktop_factor = 0;
+    // Drives the animated "peek at desktop" percentage: ramps showingDesktopFactor()
+    // linearly over time (the windowaperture effect applies its own InOutCubic
+    // easing on top), mirroring how the expose/overview effect ramps its
+    // partialActivationFactor.
+    QTimer m_showingDesktopFactorTimer;
+    QElapsedTimer m_showingDesktopFactorClock;
+    qreal m_showingDesktopFactorFrom = 0.0;
+    qreal m_showingDesktopFactorTo = 0.0;
+    int m_showingDesktopFactorDuration = 0;
+    static constexpr int s_showingDesktopFactorBaseDuration = 250;
 
     QList<Group *> groups;
 
@@ -829,6 +890,11 @@ inline SessionManager *Workspace::sessionManager() const
 inline bool Workspace::showingDesktop() const
 {
     return showing_desktop;
+}
+
+inline qreal Workspace::showingDesktopFactor() const
+{
+    return showing_desktop_factor;
 }
 
 inline bool Workspace::globalShortcutsDisabled() const

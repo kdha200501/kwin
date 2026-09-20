@@ -281,6 +281,7 @@ bool ScriptedEffect::init(const QString &effectName, const QString &pathToScript
         QStringLiteral("registerScreenEdge"),
         QStringLiteral("registerRealtimeScreenEdge"),
         QStringLiteral("registerTouchScreenEdge"),
+        QStringLiteral("registerTouchpadPinchGesture"),
         QStringLiteral("unregisterScreenEdge"),
         QStringLiteral("unregisterTouchScreenEdge"),
 
@@ -781,6 +782,25 @@ bool ScriptedEffect::unregisterTouchScreenEdge(int edge)
     }
     delete it.value();
     m_touchScreenEdgeCallbacks.erase(it);
+    return true;
+}
+
+bool ScriptedEffect::registerTouchpadPinchGesture(int direction, int fingerCount,
+                                                  const QJSValue &progressCallback,
+                                                  const QJSValue &endCallback)
+{
+    if (!progressCallback.isCallable() || !endCallback.isCallable()) {
+        m_engine->throwError(QStringLiteral("Touchpad pinch gesture handlers must be callable"));
+        return false;
+    }
+    QAction *action = new QAction(this);
+    connect(action, &QAction::triggered, this, [endCallback]() {
+        QJSValue(endCallback).call();
+    });
+    effects->registerTouchpadPinchShortcut(static_cast<PinchDirection>(direction), fingerCount, action,
+                                            [progressCallback](qreal progress) {
+                                                QJSValue(progressCallback).call({progress});
+                                            });
     return true;
 }
 

@@ -797,6 +797,14 @@ public:
     bool hasNETSupport() const;
     bool isDesktop() const;
     bool isDock() const;
+    /**
+     * Whether this window is a "show desktop" participant, i.e. one that gets
+     * hidden/moved away when the desktop is shown (and restored afterwards).
+     * This is the authoritative participant set, independent of the
+     * committed @ref showingDesktop() state, so it can drive live previews
+     * (e.g. gesture-driven) before that boolean has flipped.
+     */
+    bool breaksShowingDesktop() const;
     bool isToolbar() const;
     bool isMenu() const;
     bool isNormalWindow() const; // normal as in 'NET::Normal or NET::Unknown non-transient'

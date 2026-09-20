@@ -13,6 +13,8 @@
 #include "workspace.h"
 // kwin libs
 #include "opengl/glplatform.h"
+
+#include <algorithm>
 // kwin
 #include "core/output.h"
 #if KWIN_BUILD_ACTIVITIES
@@ -197,6 +199,7 @@ void Workspace::init()
     m_screenEdges->setConfig(config);
     m_screenEdges->init();
     connect(options, &Options::configChanged, m_screenEdges.get(), &ScreenEdges::reconfigure);
+    connect(&m_showingDesktopFactorTimer, &QTimer::timeout, this, &Workspace::showDesktopFactorTick);
     connect(VirtualDesktopManager::self(), &VirtualDesktopManager::layoutChanged, m_screenEdges.get(), &ScreenEdges::updateLayout);
     connect(this, &Workspace::windowActivated, m_screenEdges.get(), &ScreenEdges::checkBlocking);
 
@@ -1747,7 +1750,7 @@ xcb_window_t Workspace::nullFocusWindow() const
 
 bool Workspace::breaksShowingDesktop(Window *window) const
 {
-    return !(window->isUnmanaged() || window->isDock() || window->isDesktop() || window->belongsToDesktop() || window->isInputMethod());
+    return window->breaksShowingDesktop();
 }
 
 void Workspace::setShowingDesktop(bool showing, bool animated)
@@ -1782,9 +1785,78 @@ void Workspace::setShowingDesktop(bool showing, bool animated)
             activateWindow(window);
         }
     }
+    if (showing) {
+        if (animated && showing_desktop_factor != 1.0) {
+            // "Peek at desktop": animate the percentage from its current value to
+            // 1.0 over a fixed duration, mirroring how the expose/overview effect
+            // animates (ramps, not jumps) its partialActivationFactor when its
+            // toggle is triggered from a keyboard shortcut. The windowaperture
+            // effect previews the transition off showingDesktopFactorChanged, so
+            // this is what makes the effect visibly animate.
+            animateShowingDesktopFactor(1.0);
+        }
+    }
+    // The factor is only a live-preview driver (consumed via
+    // showingDesktopFactorChanged). On hide, and for non-animated toggles, the
+    // actual window motion is driven by showingDesktopChanged (emitted below), so
+    // we snap the factor *without* emitting: emitting here would also fire the
+    // live preview, which would pull the windows back to normal *before* the
+    // restore animation starts.
+    if (!showing || !animated) {
+        m_showingDesktopFactorTimer.stop();
+        showing_desktop_factor = showing ? 1.0 : 0.0;
+    }
     if (changed) {
         Q_EMIT showingDesktopChanged(showing, animated);
     }
+}
+
+void Workspace::setShowingDesktopFactor(qreal factor)
+{
+    factor = std::clamp(factor, 0.0, 1.0);
+    if (showing_desktop_factor == factor) {
+        return;
+    }
+    m_showingDesktopFactorTimer.stop();
+    showing_desktop_factor = factor;
+    Q_EMIT showingDesktopFactorChanged(showing_desktop_factor);
+}
+
+void Workspace::animateShowingDesktopFactor(qreal target)
+{
+    m_showingDesktopFactorTimer.stop();
+    m_showingDesktopFactorFrom = showing_desktop_factor;
+    m_showingDesktopFactorTo = std::clamp(target, 0.0, 1.0);
+    // Duration mirrors the effect's own Effect::animationTime(s_showingDesktopFactorBaseDuration):
+    // base * animationTimeFactor (not factor-cast-to-int first, which would zero out at a 0.5 factor).
+    m_showingDesktopFactorDuration = qMax(1, qRound(s_showingDesktopFactorBaseDuration * options->animationTimeFactor()));
+    m_showingDesktopFactorClock.start();
+    m_showingDesktopFactorTimer.start(1000 / 60);
+}
+
+void Workspace::showDesktopFactorTick()
+{
+    const qreal progress = qMin(1.0, static_cast<qreal>(m_showingDesktopFactorClock.elapsed()) / m_showingDesktopFactorDuration);
+    if (progress >= 1.0) {
+        m_showingDesktopFactorTimer.stop();
+        showing_desktop_factor = m_showingDesktopFactorTo;
+    } else {
+        showing_desktop_factor = m_showingDesktopFactorFrom + (m_showingDesktopFactorTo - m_showingDesktopFactorFrom) * progress;
+    }
+    Q_EMIT showingDesktopFactorChanged(showing_desktop_factor);
+}
+
+void Workspace::commitShowingDesktopFromFactor()
+{
+    const bool showing = showing_desktop_factor > 0.5;
+    setShowingDesktop(showing);
+    // setShowingDesktop() only emits showingDesktopChanged() when this actually
+    // flips the boolean state; if the gesture was cancelled/aborted back to the
+    // state it started from, that signal never fires. Emit this unconditionally
+    // so consumers can still play a real settle animation for the live scrub
+    // that just ended, instead of it being left frozen wherever the gesture
+    // stopped.
+    Q_EMIT showingDesktopFactorSettled(showing);
 }
 
 void Workspace::disableGlobalShortcutsForClient(bool disable)
