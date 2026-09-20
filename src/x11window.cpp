@@ -4303,6 +4303,10 @@ void X11Window::restackWindow(xcb_window_t above, int detail, NET::RequestSource
 
 bool X11Window::belongsToDesktop() const
 {
+    // The group is gone once the window is being released, but effects may still query it
+    if (!group()) {
+        return false;
+    }
     const auto members = group()->members();
     for (const X11Window *window : members) {
         if (window->isDesktop()) {
