@@ -127,7 +127,7 @@ bool WaylandWindow::belongsToSameApplication(const Window *other, SameApplicatio
             return true;
         }
     }
-    if (auto s = other->surface()) {
+    if (auto s = other->surface(); s && surface()) {
         return s->client() == surface()->client();
     }
     return false;
