@@ -332,6 +332,15 @@ class KWIN_EXPORT EffectWindow : public QObject
     Q_PROPERTY(bool hiddenByShowDesktop READ isHiddenByShowDesktop)
 
     /**
+     * Whether this EffectWindow is a "show desktop" participant, i.e. one that
+     * gets moved away/hidden when the desktop is shown (and restored
+     * afterwards). This is independent of the @ref hiddenByShowDesktop state
+     * (which is only set once the boolean is committed), so it can be used to
+     * drive live gesture-driven previews before that commit happens.
+     */
+    Q_PROPERTY(bool breaksShowingDesktop READ breaksShowingDesktop)
+
+    /**
      * A client-provided tag of the window.
      * Not necessarily unique, but can be used to identify similar windows
      * across application restarts
@@ -364,6 +373,7 @@ public:
     bool isDeleted() const;
     bool isHidden() const;
     bool isHiddenByShowDesktop() const;
+    bool breaksShowingDesktop() const;
 
     bool isMinimized() const;
     double opacity() const;

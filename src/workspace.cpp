@@ -13,6 +13,8 @@
 #include "workspace.h"
 // kwin libs
 #include "opengl/glplatform.h"
+
+#include <algorithm>
 // kwin
 #include "core/output.h"
 #if KWIN_BUILD_ACTIVITIES
@@ -1747,7 +1749,7 @@ xcb_window_t Workspace::nullFocusWindow() const
 
 bool Workspace::breaksShowingDesktop(Window *window) const
 {
-    return !(window->isUnmanaged() || window->isDock() || window->isDesktop() || window->belongsToDesktop() || window->isInputMethod());
+    return window->breaksShowingDesktop();
 }
 
 void Workspace::setShowingDesktop(bool showing, bool animated)
@@ -1782,9 +1784,33 @@ void Workspace::setShowingDesktop(bool showing, bool animated)
             activateWindow(window);
         }
     }
+    setShowingDesktopFactor(showing ? 1.0 : 0.0);
     if (changed) {
         Q_EMIT showingDesktopChanged(showing, animated);
     }
+}
+
+void Workspace::setShowingDesktopFactor(qreal factor)
+{
+    factor = std::clamp(factor, 0.0, 1.0);
+    if (showing_desktop_factor == factor) {
+        return;
+    }
+    showing_desktop_factor = factor;
+    Q_EMIT showingDesktopFactorChanged(showing_desktop_factor);
+}
+
+void Workspace::commitShowingDesktopFromFactor()
+{
+    const bool showing = showing_desktop_factor > 0.5;
+    setShowingDesktop(showing);
+    // setShowingDesktop() only emits showingDesktopChanged() when this actually
+    // flips the boolean state; if the gesture was cancelled/aborted back to the
+    // state it started from, that signal never fires. Emit this unconditionally
+    // so consumers can still play a real settle animation for the live scrub
+    // that just ended, instead of it being left frozen wherever the gesture
+    // stopped.
+    Q_EMIT showingDesktopFactorSettled(showing);
 }
 
 void Workspace::disableGlobalShortcutsForClient(bool disable)

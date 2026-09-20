@@ -132,6 +132,22 @@ public:
     Q_SCRIPTABLE bool registerTouchScreenEdge(int edge, const QJSValue &callback);
     Q_SCRIPTABLE bool unregisterTouchScreenEdge(int edge);
 
+    /**
+     * Registers a realtime touchpad pinch gesture. @p direction must be one of
+     * KWin::PinchDirection (0 = Expanding, 1 = Contracting). @p progressCallback is
+     * invoked continuously while the gesture is in progress with a single real
+     * argument representing progress since the pinch gesture started in this
+     * direction; it starts at 0.0 but is *not* clamped to 1.0, so callbacks should
+     * clamp it themselves if needed. @p endCallback is invoked once with no
+     * arguments when the gesture ends, regardless of whether it was completed or
+     * cancelled by lifting fingers; it is the responsibility of the callback to
+     * decide, based on the last progress value it received, whether to commit or
+     * revert.
+     */
+    Q_SCRIPTABLE bool registerTouchpadPinchGesture(int direction, int fingerCount,
+                                                   const QJSValue &progressCallback,
+                                                   const QJSValue &endCallback);
+
     Q_SCRIPTABLE quint64 animate(KWin::EffectWindow *window, Attribute attribute, int ms,
                                  const QJSValue &to, const QJSValue &from = QJSValue(),
                                  uint metaData = 0, int curve = QEasingCurve::Linear, int delay = 0,
