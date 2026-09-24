@@ -51,6 +51,16 @@ void AbstractEffectLoader::setConfig(KSharedConfig::Ptr config)
 
 LoadEffectFlags AbstractEffectLoader::readConfig(const QString &effectName, bool defaultValue) const
 {
+    // the window open/close animation is hardcoded to Fade; saved settings are ignored:
+    // fade always loads, while its exclusive group siblings (scale, glide) never do.
+    if (effectName == QLatin1StringView("fade")) {
+        return LoadEffectFlag::Load;
+    }
+    if (effectName == QLatin1StringView("scale") || effectName == QLatin1StringView("glide")) {
+        qCDebug(KWIN_CORE) << "Effect is hardcoded to be disabled: " << effectName;
+        return LoadEffectFlags();
+    }
+
     Q_ASSERT(m_config);
     KConfigGroup plugins(m_config, QStringLiteral("Plugins"));
 
@@ -107,6 +117,12 @@ QStringList ScriptedEffectLoader::listOfKnownEffects() const
 
 bool ScriptedEffectLoader::loadEffect(const QString &name)
 {
+    // the window open/close animation is hardcoded to Fade; its exclusive group sibling scale is disabled
+    if (name == QLatin1StringView("scale")) {
+        qCDebug(KWIN_CORE) << "Effect is hardcoded to be disabled: " << name;
+        return false;
+    }
+
     auto effect = findEffect(name);
     if (!effect.isValid()) {
         return false;
@@ -335,6 +351,12 @@ QStringList PluginEffectLoader::listOfKnownEffects() const
 
 bool PluginEffectLoader::loadEffect(const QString &name)
 {
+    // the window open/close animation is hardcoded to Fade; its exclusive group sibling glide is disabled
+    if (name == QLatin1StringView("glide")) {
+        qCDebug(KWIN_CORE) << "Effect is hardcoded to be disabled: " << name;
+        return false;
+    }
+
     const auto info = findEffect(name);
     return loadEffect(info, LoadEffectFlag::Load);
 }
