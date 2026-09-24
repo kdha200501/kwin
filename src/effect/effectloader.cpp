@@ -346,6 +346,13 @@ bool PluginEffectLoader::loadEffect(const KPluginMetaData &info, LoadEffectFlags
         return false;
     }
     const QString name = info.pluginId();
+    // zoom & magnifier are hardcoded to disabled; saved settings are ignored.
+    // - The zoom feature is the zoom/magnifier effect. With loadEffect returning false, ZoomEffect is never constructed, so no zoom overlay is ever active.
+    // - The global shortcuts (Meta ++ / − / 0, the MoveZoom* ones) and the touchpad pinch gesture are registered inside the ZoomEffect constructor (src/plugins/zoom/zoom.cpp). Since the effect is never built, none of those get registered either.
+    if (name == QLatin1String("zoom") || name == QLatin1String("magnifier")) {
+        qCDebug(KWIN_CORE) << "Effect is hardcoded to be disabled: " << name;
+        return false;
+    }
     if (!flags.testFlag(LoadEffectFlag::Load)) {
         qCDebug(KWIN_CORE) << "Loading flags disable effect: " << name;
         return false;
