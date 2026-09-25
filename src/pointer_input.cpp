@@ -862,21 +862,9 @@ PointerInputRedirection::EdgeBarrierType PointerInputRedirection::edgeBarrierTyp
 
 qreal PointerInputRedirection::edgeBarrier(EdgeBarrierType type) const
 {
-    const auto barrierWidth = options->edgeBarrier();
-    switch (type) {
-    case EdgeBarrierType::WindowMoveBarrier:
-    case EdgeBarrierType::WindowResizeBarrier:
-        return 1.5 * barrierWidth;
-    case EdgeBarrierType::EdgeElementBarrier:
-        return 2 * barrierWidth;
-    case EdgeBarrierType::CornerBarrier:
-        return 2000;
-    case EdgeBarrierType::NormalBarrier:
-        return barrierWidth;
-    default:
-        Q_UNREACHABLE();
-        return 0;
-    }
+    Q_UNUSED(type);
+    // Edge and corner barriers are disabled.
+    return 0;
 }
 
 QPointF PointerInputRedirection::applyEdgeBarrier(const QPointF &pos, const QPointF &relativeMotion, const LogicalOutput *currentOutput, std::chrono::microseconds time)
