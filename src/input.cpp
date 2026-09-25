@@ -3167,10 +3167,7 @@ void InputRedirection::setupInputFilters()
     installInputEventFilter(m_lockscreenFilter.get());
 #endif
 
-    if (kwinApp()->supportsGlobalShortcuts()) {
-        m_screenEdgeFilter = std::make_unique<ScreenEdgeInputFilter>();
-        installInputEventFilter(m_screenEdgeFilter.get());
-    }
+    // Screen edges (electric borders and corners) are disabled.
 
     m_dragAndDropFilter = std::make_unique<DragAndDropInputFilter>();
     installInputEventFilter(m_dragAndDropFilter.get());
