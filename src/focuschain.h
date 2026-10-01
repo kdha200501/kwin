@@ -166,6 +166,23 @@ public:
      */
     Window *firstMostRecentlyUsed() const;
 
+    /**
+     * @brief Checks whether @p window is a usable candidate for the next keyboard focus
+     * when @p prev is being deactivated.
+     *
+     * Used by @ref nextForDesktop() and by Workspace::activateNextWindow() to filter the
+     * windows that the automatic "focus the next window" fallback may pick. A candidate
+     * is a window that is shown on the current desktop and activity, reachable under the
+     * current focus options (e.g. separate screen focus), and a real user-facing window -
+     * not an invisible compositor helper surface, a zombie in its close animation, or a
+     * non-interactive surface that cannot claim focus for itself.
+     *
+     * The checks and the reasoning behind them are documented in the implementation.
+     *
+     * @param window The Window to check.
+     * @param prev The Window being deactivated (the reference Window of the search).
+     * @return bool @c true if @p window can be activated as the next focus.
+     */
     bool isUsableFocusCandidate(Window *window, Window *prev) const;
 
 public Q_SLOTS:
