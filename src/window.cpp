@@ -597,7 +597,16 @@ bool Window::belongsToDesktop() const
 
 bool Window::breaksShowingDesktop() const
 {
-    return !(isUnmanaged() || isDock() || isDesktop() || belongsToDesktop() || isInputMethod());
+    // A window that sets both skipTaskbar() and skipPager() is a shell/utility
+    // surface, not a regular application window - e.g. the quick look preview,
+    // which maps on top of everything while the desktop is being shown (it sets
+    // both NET states on X11, and every layer-shell window gets both from kwin
+    // on Wayland). Show desktop targets the regular windows, so for such a
+    // surface this reports: it must stay put, and mapping it must not cancel an
+    // active "Peek at Desktop" session (the addWaylandWindow()/addX11Window()
+    // guards call this while the state is on).
+    return !(isUnmanaged() || isDock() || isDesktop() || belongsToDesktop() || isInputMethod()
+             || (skipTaskbar() && skipPager()));
 }
 
 void Window::setKeepAbove(bool b)
