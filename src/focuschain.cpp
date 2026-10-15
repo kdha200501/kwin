@@ -11,6 +11,8 @@
 #include "window.h"
 #include "workspace.h"
 
+#include <unistd.h>
+
 namespace KWin
 {
 
@@ -243,10 +245,77 @@ Window *FocusChain::nextMostRecentlyUsed(Window *reference) const
     return m_mostRecentlyUsed.at(index - 1);
 }
 
-// copied from activation.cpp
+// Adapted from the focus-candidate checks the old Workspace::activateNextClient() in
+// activation.cpp performed inline before falling back to a window.
 bool FocusChain::isUsableFocusCandidate(Window *c, Window *prev) const
 {
-    return c != prev && c->isShown() && c->isOnCurrentDesktop() && c->isOnCurrentActivity() && (!m_separateScreenFocus || c->isOnOutput(prev ? prev->output() : workspace()->activeOutput()));
+    // if the candidate is the reference window itself
+    if (c == prev) {
+        // then (re)activating it is a no-op, so it is not a new candidate
+        return false;
+    }
+
+    // if the window is deleted
+    if (c->isDeleted()) {
+        // then it is a zombie with no live surface: it stays in the focus chains
+        // until the close animation finishes (see markAsDeleted()/addDeleted() and
+        // Workspace::removeWaylandWindow(), which runs this search before the window
+        // is removed), and its client process has typically already exited, so it
+        // cannot take the focus
+        return false;
+    }
+
+    // if the window is one of KWin's own helper surfaces (OSD, tabbox, debug console, ...)
+    if (c->isInternal()) {
+        // then it is a WindowType::Normal surface (see InternalWindow::windowType())
+        // that can stay mapped all session, so it would win the fallback ahead of
+        // real windows and leave the focus stuck on an invisible surface
+        return false;
+    }
+
+    // if the window is owned by the compositor process itself
+    if (c->pid() == getpid()) {
+        // then it is a helper surface isInternal() misses (e.g. a layer-shell overlay
+        // back on KWin's socket); use the same check KWin uses elsewhere to recognize
+        // its own client connection (see WaylandWindow::killWindow(), WaylandServer)
+        return false;
+    }
+
+    // if the window has declared itself not a real, user-facing window (skipSwitcher)
+    if (c->skipSwitcher()) {
+        // then requestFocus() takes the async WM_TAKE_FOCUS branch (see
+        // X11Window::takesAsyncFocus()): it reports success without ever activating,
+        // waiting on an XSetInputFocus these non-interactive helpers (screen-sharing
+        // and the like) never send, so it would leave the focus stuck on it
+        return false;
+    }
+
+    // if the window is not shown (minimized or hidden)
+    if (!c->isShown()) {
+        // then there is no visible surface to take the focus on
+        return false;
+    }
+
+    // if the window is on another desktop
+    if (!c->isOnCurrentDesktop()) {
+        // then it is not reachable from the desktop the user is on
+        return false;
+    }
+
+    // if the window belongs to another activity
+    if (!c->isOnCurrentActivity()) {
+        // then it is not reachable from the activity the user is in
+        return false;
+    }
+
+    // if separate screen focus is on and the window is on another screen
+    if (m_separateScreenFocus && !c->isOnOutput(prev ? prev->output() : workspace()->activeOutput())) {
+        // then each screen keeps its own active window, so only one on the relevant
+        // screen (the reference's, or the active screen's) is a candidate
+        return false;
+    }
+
+    return true;
 }
 
 Window *FocusChain::nextForDesktop(Window *reference, VirtualDesktop *desktop) const
