@@ -7,7 +7,11 @@ endfunction()
 # Add a CMake-time check for python3 to avoid failures during build.
 find_package (Python3 COMPONENTS Interpreter)
 add_feature_info("Python3" Python3_Interpreter_FOUND "Required to strip effects metadata")
-set(KSEM_EXE "${CMAKE_CURRENT_SOURCE_DIR}/strip-effect-metadata.py")
+if (Python3_EXECUTABLE)
+    set(KSEM_EXE ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/strip-effect-metadata.py")
+else ()
+    set(KSEM_EXE python3 "${CMAKE_CURRENT_SOURCE_DIR}/strip-effect-metadata.py")
+endif ()
 
 function (kwin_strip_builtin_effect_metadata target metadata)
     set(stripped_metadata "${CMAKE_CURRENT_BINARY_DIR}/${metadata}.stripped")
